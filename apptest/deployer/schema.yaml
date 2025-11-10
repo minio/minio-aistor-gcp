@@ -1,0 +1,97 @@
+x-google-marketplace:
+  schemaVersion: v2
+  applicationApiVersion: v1beta1
+  publishedVersion: '1.0.0'
+  publishedVersionMetadata:
+    releaseNote: >-
+      Initial release of MinIO AIStor on GCP Marketplace
+    releaseTypes:
+      - Feature
+    recommended: true
+
+  images:
+    'operator':
+      properties:
+        aistor-objectstore-operator.image.repository:
+          type: REPO_WITH_REGISTRY
+        aistor-objectstore-operator.image.tag:
+          type: TAG
+    'minio':
+      properties:
+        aistor-objectstore.objectStore.image.repository:
+          type: REPO_WITH_REGISTRY
+        aistor-objectstore.objectStore.image.tag:
+          type: TAG
+
+  clusterConstraints:
+    resources:
+    - replicas: 4
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+
+properties:
+  name:
+    type: string
+    x-google-marketplace:
+      type: NAME
+    default: minio-aistor-test
+
+  namespace:
+    type: string
+    x-google-marketplace:
+      type: NAMESPACE
+    default: minio-aistor-test
+
+  license:
+    type: string
+    default: "TEST_LICENSE_KEY"
+
+  aistor-objectstore.objectStore.pools[0].servers:
+    type: integer
+    default: 4
+
+  aistor-objectstore.objectStore.pools[0].volumesPerServer:
+    type: integer
+    default: 1
+
+  aistor-objectstore.objectStore.pools[0].size:
+    type: string
+    default: 10Gi
+
+  aistor-objectstore.secrets.accessKey:
+    type: string
+    default: admin
+
+  aistor-objectstore.secrets.secretKey:
+    type: string
+    x-google-marketplace:
+      type: GENERATED_PASSWORD
+      generatedPassword:
+        length: 16
+
+  serviceAccount:
+    type: string
+    x-google-marketplace:
+      type: SERVICE_ACCOUNT
+      serviceAccount:
+        roles:
+        - type: ClusterRole
+          rulesType: CUSTOM
+          rules:
+          - apiGroups: [""]
+            resources: ["persistentvolumeclaims", "services", "pods", "secrets", "configmaps", "serviceaccounts"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+          - apiGroups: ["apps"]
+            resources: ["statefulsets", "deployments"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+          - apiGroups: ["aistor.min.io"]
+            resources: ["objectstores", "objectstores/status", "objectstores/finalizers"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+required:
+- name
+- namespace
+- license
+- aistor-objectstore.objectStore.pools[0].servers
+- serviceAccount

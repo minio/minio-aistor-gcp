@@ -1,0 +1,41 @@
+# Build artifacts
+*.tar.gz
+*.tgz
+
+# Docker
+.dockerignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Helm
+chart/minio-aistor/charts/
+chart/minio-aistor/Chart.lock
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Credentials and secrets
+*.key
+*.pem
+*.crt
+credentials.json
+service-account.json
+
+# Local configuration overrides
+local-values.yaml
+override-values.yaml
+
+# Test data
+test-data/
+*.test

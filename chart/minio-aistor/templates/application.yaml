@@ -1,0 +1,183 @@
+apiVersion: app.k8s.io/v1beta1
+kind: Application
+metadata:
+  name: "{{ .Release.Name }}"
+  namespace: "{{ .Release.Namespace }}"
+  annotations:
+    kubernetes-engine.cloud.google.com/icon: >-
+      data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==
+    marketplace.cloud.google.com/deploy-info: '{"partner_id": "minio-inc-public", "product_id": "minio-aistor-objectstore", "partner_name": "MinIO Inc"}'
+  labels:
+    app.kubernetes.io/name: "{{ .Release.Name }}"
+    app.kubernetes.io/version: "{{ .Chart.AppVersion }}"
+spec:
+  descriptor:
+    type: MinIO AIStor
+    version: "{{ .Chart.AppVersion }}"
+    description: |-
+      MinIO AIStor is an enterprise-grade, high-performance object storage solution optimized for AI/ML workloads.
+
+      This deployment uses the MinIO AIStor Operator for automated lifecycle management.
+
+      # Features
+      - **High-Performance**: Optimized for AI/ML data pipeline requirements
+      - **S3 Compatible**: Full compatibility with Amazon S3 API
+      - **Enterprise-Grade**: Production-ready with operator-based management
+      - **Scalable**: Horizontal scaling with erasure coding
+      - **Multi-Cloud**: Portable across cloud providers
+      - **Advanced Caching**: Intelligent caching for training datasets
+      - **Operator-Managed**: Automated upgrades, scaling, and configuration
+
+      # Architecture
+      This package deploys:
+      - MinIO AIStor Operator (manages object store lifecycle)
+      - MinIO AIStor Object Store (your storage cluster)
+
+      # Requirements
+      - Valid MinIO AIStor Enterprise license
+      - Minimum 4 nodes for distributed mode
+      - GKE cluster with sufficient resources
+
+      # Support
+      - Documentation: https://docs.min.io/enterprise/aistor-object-store/
+      - Contact: https://min.io/contact
+      - Support: https://min.io/support
+    maintainers:
+    - name: MinIO Inc
+      email: dev@min.io
+      url: https://min.io
+    links:
+    - description: 'MinIO AIStor Documentation'
+      url: https://docs.min.io/enterprise/aistor-object-store/
+    - description: 'Getting Started Guide'
+      url: https://docs.min.io/enterprise/aistor-object-store/installation/kubernetes/
+    - description: 'MinIO Console Guide'
+      url: https://min.io/docs/minio/linux/administration/minio-console.html
+    notes: |-
+      # MinIO AIStor Deployed Successfully!
+
+      Your MinIO AIStor Object Store with Operator is being provisioned.
+
+      ## Access Credentials
+
+      Get your root access credentials:
+      ```bash
+      # Access Key (username)
+      kubectl get secret {{ index .Values "aistor-objectstore" "secrets" "name" }} \
+        -n {{ .Release.Namespace }} \
+        -o jsonpath='{.data.config\.env}' | base64 -d | grep MINIO_ROOT_USER
+
+      # Secret Key (password)
+      kubectl get secret {{ index .Values "aistor-objectstore" "secrets" "name" }} \
+        -n {{ .Release.Namespace }} \
+        -o jsonpath='{.data.config\.env}' | base64 -d | grep MINIO_ROOT_PASSWORD
+      ```
+
+      ## Monitor Deployment
+
+      Check operator status:
+      ```bash
+      kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/name=aistor-objectstore-operator
+      ```
+
+      Check object store status:
+      ```bash
+      kubectl get objectstore -n {{ .Release.Namespace }}
+      kubectl get pods -n {{ .Release.Namespace }} -l app={{ index .Values "aistor-objectstore" "objectStore" "name" }}
+      ```
+
+      ## Access MinIO Console
+
+      {{- $consoleServiceType := index .Values "aistor-objectstore" "objectStore" "services" "console" "serviceType" }}
+      {{- if eq $consoleServiceType "LoadBalancer" }}
+      Wait for LoadBalancer external IP:
+      ```bash
+      kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/console={{ index .Values "aistor-objectstore" "objectStore" "name" }}
+      ```
+      Access via: http://<EXTERNAL-IP>
+      {{- else if eq $consoleServiceType "NodePort" }}
+      Get NodePort:
+      ```bash
+      kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/console={{ index .Values "aistor-objectstore" "objectStore" "name" }}
+      ```
+      Access via: http://<NODE-IP>:<NODE-PORT>
+      {{- else }}
+      Port-forward to access locally:
+      ```bash
+      kubectl port-forward -n {{ .Release.Namespace }} \
+        svc/$(kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/console={{ index .Values "aistor-objectstore" "objectStore" "name" }} -o name | head -1) \
+        9001:9001
+      ```
+      Access via: http://localhost:9001
+      {{- end }}
+
+      ## Access MinIO API (S3 Endpoint)
+
+      {{- $minioServiceType := index .Values "aistor-objectstore" "objectStore" "services" "minio" "serviceType" }}
+      {{- if eq $minioServiceType "LoadBalancer" }}
+      Wait for LoadBalancer external IP:
+      ```bash
+      kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/tenant={{ index .Values "aistor-objectstore" "objectStore" "name" }}
+      ```
+      S3 Endpoint: http://<EXTERNAL-IP>:9000
+      {{- else if eq $minioServiceType "NodePort" }}
+      Get NodePort:
+      ```bash
+      kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/tenant={{ index .Values "aistor-objectstore" "objectStore" "name" }}
+      ```
+      S3 Endpoint: http://<NODE-IP>:<NODE-PORT>
+      {{- else }}
+      Port-forward to access locally:
+      ```bash
+      kubectl port-forward -n {{ .Release.Namespace }} \
+        svc/$(kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/tenant={{ index .Values "aistor-objectstore" "objectStore" "name" }} -o name | head -1) \
+        9000:9000
+      ```
+      S3 Endpoint: http://localhost:9000
+      {{- end }}
+
+      ## Using MinIO Client (mc)
+
+      Install and configure mc CLI:
+      ```bash
+      # Install mc
+      wget https://dl.min.io/client/mc/release/linux-amd64/mc
+      chmod +x mc && sudo mv mc /usr/local/bin/
+
+      # Configure alias
+      mc alias set myaistor http://<ENDPOINT>:9000 <ACCESS-KEY> <SECRET-KEY>
+
+      # Test connection
+      mc admin info myaistor
+      ```
+
+      For complete documentation, visit: https://docs.min.io/enterprise/aistor-object-store/
+  info:
+  - name: Operator Status
+    value: Check with 'kubectl get pods -l app.kubernetes.io/name=aistor-objectstore-operator'
+  - name: Object Store Name
+    value: {{ index .Values "aistor-objectstore" "objectStore" "name" }}
+  - name: Replicas
+    value: {{ index .Values "aistor-objectstore" "objectStore" "pools" 0 "servers" | quote }}
+  - name: Storage per Volume
+    value: {{ index .Values "aistor-objectstore" "objectStore" "pools" 0 "size" }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: "{{ .Release.Name }}"
+  componentKinds:
+  - group: v1
+    kind: Service
+  - group: apps/v1
+    kind: StatefulSet
+  - group: apps/v1
+    kind: Deployment
+  - group: v1
+    kind: Secret
+  - group: v1
+    kind: ConfigMap
+  - group: v1
+    kind: PersistentVolumeClaim
+  - group: v1
+    kind: ServiceAccount
+  - group: aistor.min.io/v1
+    kind: ObjectStore

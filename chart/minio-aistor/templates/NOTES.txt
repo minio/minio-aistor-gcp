@@ -1,0 +1,109 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your MinIO AIStor cluster with Operator is being deployed in namespace: {{ .Release.Namespace }}
+
+===================================================================================
+DEPLOYMENT STATUS
+===================================================================================
+
+Monitor the deployment:
+
+1. Check Operator status:
+   kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/name=aistor-objectstore-operator
+
+2. Check ObjectStore CRD:
+   kubectl get objectstore -n {{ .Release.Namespace }}
+
+3. Check MinIO pods:
+   kubectl get pods -n {{ .Release.Namespace }} -l app={{ index .Values "aistor-objectstore" "objectStore" "name" }}
+
+===================================================================================
+ACCESSING MINIO AISTOR
+===================================================================================
+
+Once deployment is complete:
+
+1. Get your MinIO root credentials:
+
+   kubectl get secret {{ index .Values "aistor-objectstore" "secrets" "name" }} \
+     -n {{ .Release.Namespace }} \
+     -o jsonpath='{.data.config\.env}' | base64 -d
+
+2. Access MinIO Console (Web UI):
+
+{{- $consoleServiceType := index .Values "aistor-objectstore" "objectStore" "services" "console" "serviceType" }}
+{{- if eq $consoleServiceType "LoadBalancer" }}
+   Wait for LoadBalancer IP:
+   kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/console={{ index .Values "aistor-objectstore" "objectStore" "name" }}
+
+   Access via: http://<EXTERNAL-IP>:9001
+{{- else if eq $consoleServiceType "NodePort" }}
+   Get NodePort:
+   kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/console={{ index .Values "aistor-objectstore" "objectStore" "name" }}
+
+   Access via: http://<NODE-IP>:<NODE-PORT>
+{{- else }}
+   Port-forward:
+   kubectl port-forward -n {{ .Release.Namespace }} \
+     svc/$(kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/console={{ index .Values "aistor-objectstore" "objectStore" "name" }} -o name | head -1) \
+     9001:9001
+
+   Access via: http://localhost:9001
+{{- end }}
+
+3. Access MinIO API (S3 endpoint):
+
+{{- $minioServiceType := index .Values "aistor-objectstore" "objectStore" "services" "minio" "serviceType" }}
+{{- if eq $minioServiceType "LoadBalancer" }}
+   Wait for LoadBalancer IP:
+   kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/tenant={{ index .Values "aistor-objectstore" "objectStore" "name" }}
+
+   S3 Endpoint: http://<EXTERNAL-IP>:9000
+{{- else if eq $minioServiceType "NodePort" }}
+   Get NodePort:
+   kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/tenant={{ index .Values "aistor-objectstore" "objectStore" "name" }}
+
+   S3 Endpoint: http://<NODE-IP>:<NODE-PORT>
+{{- else }}
+   Port-forward:
+   kubectl port-forward -n {{ .Release.Namespace }} \
+     svc/$(kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/tenant={{ index .Values "aistor-objectstore" "objectStore" "name" }} -o name | head -1) \
+     9000:9000
+
+   S3 Endpoint: http://localhost:9000
+{{- end }}
+
+===================================================================================
+USING MINIO CLIENT (mc)
+===================================================================================
+
+Install MinIO Client:
+  wget https://dl.min.io/client/mc/release/linux-amd64/mc
+  chmod +x mc && sudo mv mc /usr/local/bin/
+
+Configure mc alias:
+  mc alias set myaistor http://<ENDPOINT>:9000 <ACCESS-KEY> <SECRET-KEY>
+
+Test connection:
+  mc admin info myaistor
+
+===================================================================================
+CLUSTER INFORMATION
+===================================================================================
+
+Release Name:     {{ .Release.Name }}
+Namespace:        {{ .Release.Namespace }}
+Object Store:     {{ index .Values "aistor-objectstore" "objectStore" "name" }}
+Servers:          {{ index .Values "aistor-objectstore" "objectStore" "pools" 0 "servers" }}
+Volumes/Server:   {{ index .Values "aistor-objectstore" "objectStore" "pools" 0 "volumesPerServer" }}
+Storage/Volume:   {{ index .Values "aistor-objectstore" "objectStore" "pools" 0 "size" }}
+
+===================================================================================
+DOCUMENTATION
+===================================================================================
+
+MinIO AIStor Docs: https://docs.min.io/enterprise/aistor-object-store/
+Operator Guide:    https://docs.min.io/enterprise/aistor-object-store/reference/kubernetes/
+MinIO Support:     https://min.io/support
+
+Enjoy using MinIO AIStor with Operator! 🚀

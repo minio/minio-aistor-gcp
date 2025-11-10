@@ -1,0 +1,28 @@
+apiVersion: v2
+name: minio-aistor
+description: MinIO AIStor - High-Performance Object Storage for AI/ML Workloads (GCP Marketplace)
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - storage
+  - object-storage
+  - minio
+  - s3
+  - ai
+  - ml
+home: https://min.io
+sources:
+  - https://github.com/minio/minio
+maintainers:
+  - name: MinIO Inc
+    email: dev@min.io
+
+dependencies:
+  - name: aistor-objectstore-operator
+    version: "5.1.0"
+    repository: "https://helm.min.io/"
+    condition: operator.enabled
+  - name: aistor-objectstore
+    version: "1.0.9"
+    repository: "https://helm.min.io/"
+    condition: objectstore.enabled

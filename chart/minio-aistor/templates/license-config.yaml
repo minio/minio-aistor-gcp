@@ -1,0 +1,12 @@
+{{- if .Values.license }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-license-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/component: license
+data:
+  license: {{ .Values.license | quote }}
+{{- end }}

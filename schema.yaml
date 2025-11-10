@@ -1,0 +1,242 @@
+x-google-marketplace:
+  schemaVersion: v2
+  applicationApiVersion: v1beta1
+  publishedVersion: '1.0.0'
+  publishedVersionMetadata:
+    releaseNote: >-
+      Initial release of MinIO AIStor on GCP Marketplace.
+      Includes operator-based deployment for enterprise-grade object storage.
+    releaseTypes:
+      - Feature
+    recommended: true
+
+  # Image declarations
+  images:
+    'operator':
+      properties:
+        aistor-objectstore-operator.image.repository:
+          type: REPO_WITH_REGISTRY
+        aistor-objectstore-operator.image.tag:
+          type: TAG
+    'minio':
+      properties:
+        aistor-objectstore.objectStore.image.repository:
+          type: REPO_WITH_REGISTRY
+        aistor-objectstore.objectStore.image.tag:
+          type: TAG
+    deployer:
+      properties:
+        deployer.image:
+          type: FULL
+
+  # Cluster constraints
+  clusterConstraints:
+    resources:
+    - replicas: 4
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      affinity:
+        simpleNodeAffinity:
+          type: REQUIRE_ONE_NODE_PER_REPLICA
+    gcp:
+      nodes:
+        minimum: 4
+
+properties:
+  name:
+    type: string
+    x-google-marketplace:
+      type: NAME
+    title: Application name
+    description: The name of the MinIO AIStor application instance
+    default: minio-aistor
+
+  namespace:
+    type: string
+    x-google-marketplace:
+      type: NAMESPACE
+    title: Namespace
+    description: The Kubernetes namespace where MinIO AIStor will be deployed
+
+  # MinIO AIStor License (REQUIRED)
+  license:
+    type: string
+    title: AIStor License Key
+    description: |
+      MinIO AIStor Enterprise license key (JWT format, starts with 'eyJ').
+      Contact MinIO for a license: https://min.io/contact
+      IMPORTANT: Use the decoded JWT token, not the base64-encoded block.
+    minLength: 100
+    x-google-marketplace:
+      type: STRING
+
+  # Object Store Configuration
+  aistor-objectstore.objectStore.pools[0].servers:
+    type: integer
+    title: Number of servers
+    description: |
+      Number of MinIO server replicas to deploy.
+      Minimum 4 for distributed mode (recommended for production).
+      Note: Cannot upgrade from standalone (1) to distributed mode.
+    default: 4
+    minimum: 4
+    maximum: 32
+
+  aistor-objectstore.objectStore.pools[0].volumesPerServer:
+    type: integer
+    title: Volumes per server
+    description: Number of storage volumes attached to each MinIO server
+    default: 4
+    minimum: 1
+    maximum: 16
+
+  aistor-objectstore.objectStore.pools[0].size:
+    type: string
+    title: Storage size per volume
+    description: Size of persistent volume for each volume attachment
+    default: 10Gi
+    pattern: '^[1-9][0-9]*(\.[0-9]+)?[GT]i$'
+
+  aistor-objectstore.objectStore.pools[0].resources.requests.memory:
+    type: string
+    title: Memory request
+    description: Memory resource request per MinIO server
+    default: 2Gi
+    pattern: '^[1-9][0-9]*(\.[0-9]+)?[MGT]i$'
+
+  aistor-objectstore.objectStore.pools[0].resources.requests.cpu:
+    type: string
+    title: CPU request
+    description: CPU resource request per MinIO server
+    default: 1000m
+    pattern: '^[1-9][0-9]*(m|(\.[0-9]+))?$'
+
+  aistor-objectstore.objectStore.pools[0].resources.limits.memory:
+    type: string
+    title: Memory limit
+    description: Memory resource limit per MinIO server
+    default: 4Gi
+    pattern: '^[1-9][0-9]*(\.[0-9]+)?[MGT]i$'
+
+  aistor-objectstore.objectStore.pools[0].resources.limits.cpu:
+    type: string
+    title: CPU limit
+    description: CPU resource limit per MinIO server
+    default: 2000m
+    pattern: '^[1-9][0-9]*(m|(\.[0-9]+))?$'
+
+  # Root Credentials
+  aistor-objectstore.secrets.accessKey:
+    type: string
+    title: Root access key
+    description: MinIO root access key (username)
+    default: admin
+    minLength: 3
+
+  aistor-objectstore.secrets.secretKey:
+    type: string
+    x-google-marketplace:
+      type: GENERATED_PASSWORD
+      generatedPassword:
+        length: 32
+        includeSymbols: false
+        base64: false
+    title: Root secret key
+    description: MinIO root secret key (password) - auto-generated if not provided
+
+  # Service Types
+  aistor-objectstore.objectStore.services.minio.serviceType:
+    type: string
+    title: MinIO API service type
+    description: Kubernetes service type for MinIO S3 API endpoint
+    default: LoadBalancer
+    enum:
+    - ClusterIP
+    - LoadBalancer
+    - NodePort
+
+  aistor-objectstore.objectStore.services.console.serviceType:
+    type: string
+    title: MinIO Console service type
+    description: Kubernetes service type for MinIO Web Console
+    default: LoadBalancer
+    enum:
+    - ClusterIP
+    - LoadBalancer
+    - NodePort
+
+  # Storage Class (optional)
+  aistor-objectstore.objectStore.pools[0].storageClassName:
+    type: string
+    title: Storage class name
+    description: |
+      Kubernetes StorageClass for persistent volumes.
+      Leave empty to use default storage class.
+      For GKE, use 'standard-rwo' or 'premium-rwo'.
+    default: ""
+
+  # Metrics
+  aistor-objectstore.objectStore.metrics.enabled:
+    type: boolean
+    title: Enable metrics
+    description: Enable Prometheus-compatible metrics endpoint
+    default: true
+
+  # TLS Certificate (optional)
+  certificate:
+    type: string
+    x-google-marketplace:
+      type: TLS_CERTIFICATE
+      tlsCertificate:
+        generatedProperties:
+          base64EncodedPrivateKey: tls.base64EncodedPrivateKey
+          base64EncodedCertificate: tls.base64EncodedCertificate
+    title: TLS certificate (optional)
+    description: TLS certificate for MinIO (uses auto-generated cert if not provided)
+
+  # Service Account
+  serviceAccount:
+    type: string
+    title: Service account
+    x-google-marketplace:
+      type: SERVICE_ACCOUNT
+      serviceAccount:
+        description: Service account for MinIO AIStor Operator and Object Store
+        roles:
+        - type: ClusterRole
+          rulesType: CUSTOM
+          rules:
+          # Operator permissions
+          - apiGroups: [""]
+            resources: ["persistentvolumeclaims", "services", "pods", "secrets", "configmaps", "serviceaccounts"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+          - apiGroups: ["apps"]
+            resources: ["statefulsets", "deployments"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+          - apiGroups: [""]
+            resources: ["events"]
+            verbs: ["create", "patch"]
+          - apiGroups: ["aistor.min.io"]
+            resources: ["objectstores", "objectstores/status", "objectstores/finalizers"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+          - apiGroups: ["rbac.authorization.k8s.io"]
+            resources: ["rolebindings", "roles"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Usage Reporting
+  reportingSecret:
+    type: string
+    x-google-marketplace:
+      type: REPORTING_SECRET
+
+required:
+- name
+- namespace
+- license
+- aistor-objectstore.objectStore.pools[0].servers
+- aistor-objectstore.objectStore.pools[0].size
+- aistor-objectstore.secrets.accessKey
+- aistor-objectstore.secrets.secretKey
+- serviceAccount
+- reportingSecret

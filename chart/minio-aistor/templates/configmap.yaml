@@ -1,0 +1,29 @@
+{{- if .Values.reportingSecret }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-ubbagent-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+data:
+  config.yaml: |
+    metrics:
+    - name: storage_capacity
+      type: int
+      endpoints:
+      - name: disk
+        resource:
+          name: {{ .Release.Name }}
+      passthrough: {}
+
+    sources:
+    - name: storage_capacity_source
+      heartbeat:
+        metric: storage_capacity
+        value:
+          int64Value: {{ index .Values "aistor-objectstore" "objectStore" "pools" 0 "servers" | default 4 }}
+
+    endpoints:
+      - name: servicecontrol
+{{- end }}
