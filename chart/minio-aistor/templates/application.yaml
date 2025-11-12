@@ -157,10 +157,11 @@ spec:
     value: Check with 'kubectl get pods -l app.kubernetes.io/name=aistor-objectstore-operator'
   - name: Object Store Name
     value: {{ index .Values "aistor-objectstore" "objectStore" "name" }}
+  {{- $firstPool := include "minio-aistor.firstPool" . | fromYaml }}
   - name: Replicas
-    value: {{ index .Values "aistor-objectstore" "objectStore" "pools" 0 "servers" | quote }}
+    value: {{ $firstPool.servers | quote }}
   - name: Storage per Volume
-    value: {{ index .Values "aistor-objectstore" "objectStore" "pools" 0 "size" }}
+    value: {{ $firstPool.size }}
   selector:
     matchLabels:
       app.kubernetes.io/name: "{{ .Release.Name }}"

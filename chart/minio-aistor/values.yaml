@@ -16,7 +16,6 @@ license: ""
 deployer:
   image: gcr.io/cloud-marketplace-tools/k8s/deployer_helm:latest
 
-reportingSecret: ""
 serviceAccount: ""
 
 tls:
@@ -34,7 +33,7 @@ aistor-objectstore-operator:
       replicas: 1
       resources:
         requests:
-          cpu: 200m
+          cpu: 500m  # GKE Autopilot minimum for pods with anti-affinity
           memory: 256Mi
 
   operators:
@@ -54,12 +53,13 @@ aistor-objectstore:
       name: minio-aistor-env-config
 
     # Pool configuration
+    # Note: If schema provides dictionary format, it will be converted to array by template
     pools:
       - servers: 4
         name: pool-0
         volumesPerServer: 4
         size: 10Gi
-        # storageClassName: standard-rwo
+        storageClassName: ""
 
         resources:
           requests:

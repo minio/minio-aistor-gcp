@@ -64,7 +64,7 @@ MinIO AIStor can be customized during deployment. Default configuration:
 
 - **[MinIO AIStor Docs](https://docs.min.io/enterprise/aistor-object-store/)** - Official MinIO documentation
 - **[CLI Deployment Guide](CLI_DEPLOYMENT.md)** - Deploy using kubectl and gcloud
-- **[Parameter Reference](DEPLOYMENT_PARAMETERS.md)** - All 21 configuration parameters
+- **[Parameter Reference](DEPLOYMENT_PARAMETERS.md)** - All 9 configuration parameters
 
 ## Support
 

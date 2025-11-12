@@ -1,4 +1,5 @@
 {{- if .Values.reportingSecret }}
+{{- $firstPool := include "minio-aistor.firstPool" . | fromYaml }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -22,7 +23,7 @@ data:
       heartbeat:
         metric: storage_capacity
         value:
-          int64Value: {{ index .Values "aistor-objectstore" "objectStore" "pools" 0 "servers" | default 4 }}
+          int64Value: {{ $firstPool.servers | default 4 }}
 
     endpoints:
       - name: servicecontrol

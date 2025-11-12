@@ -1,34 +1,32 @@
 x-google-marketplace:
   schemaVersion: v2
   applicationApiVersion: v1beta1
-  publishedVersion: '1.0.0'
+  publishedVersion: '1.0.5'
   publishedVersionMetadata:
     releaseNote: >-
-      Initial release of MinIO AIStor on GCP Marketplace
+      Initial release of MinIO AIStor on GCP Marketplace.
+      Includes operator-based deployment for enterprise-grade object storage.
     releaseTypes:
       - Feature
     recommended: true
 
+  # Image declarations
   images:
-    'operator':
+    deployer:
       properties:
-        aistor-objectstore-operator.image.repository:
-          type: REPO_WITH_REGISTRY
-        aistor-objectstore-operator.image.tag:
-          type: TAG
-    'minio':
-      properties:
-        aistor-objectstore.objectStore.image.repository:
-          type: REPO_WITH_REGISTRY
-        aistor-objectstore.objectStore.image.tag:
-          type: TAG
+        deployer.image:
+          type: FULL
 
+  # Cluster constraints
   clusterConstraints:
     resources:
     - replicas: 4
       requests:
         cpu: 1000m
         memory: 2Gi
+      affinity:
+        simpleNodeAffinity:
+          type: REQUIRE_ONE_NODE_PER_REPLICA
 
 properties:
   name:
@@ -47,15 +45,15 @@ properties:
     type: string
     default: "TEST_LICENSE_KEY"
 
-  aistor-objectstore.objectStore.pools[0].servers:
+  aistor-objectstore.objectStore.pools.0.servers:
     type: integer
     default: 4
 
-  aistor-objectstore.objectStore.pools[0].volumesPerServer:
+  aistor-objectstore.objectStore.pools.0.volumesPerServer:
     type: integer
     default: 1
 
-  aistor-objectstore.objectStore.pools[0].size:
+  aistor-objectstore.objectStore.pools.0.size:
     type: string
     default: 10Gi
 
@@ -93,5 +91,5 @@ required:
 - name
 - namespace
 - license
-- aistor-objectstore.objectStore.pools[0].servers
+- aistor-objectstore.objectStore.pools.0.servers
 - serviceAccount

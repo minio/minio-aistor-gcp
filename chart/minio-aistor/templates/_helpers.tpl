@@ -22,28 +22,62 @@ Create a default fully qualified app name.
 {{- end }}
 
 {{/*
-Create chart name and version as used by the chart label.
+Normalize pools from either dictionary (GCP Marketplace dot notation) or array format.
+GCP Marketplace schema with dot notation like "pools.0.name" creates a dictionary with
+string keys ("0", "1", etc) instead of an array. This helper normalizes both formats.
+
+Input: The full Values object
+Output: A list of pool objects, sorted by key if input was a dictionary
+
+Usage in templates:
+  {{- $pools := include "minio-aistor.normalizePools" . | fromYaml }}
+  {{- range $pools }}
+    servers: {{ .servers }}
+  {{- end }}
 */}}
-{{- define "minio-aistor.chart" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- define "minio-aistor.normalizePools" -}}
+{{- $pools := index .Values "aistor-objectstore" "objectStore" "pools" | default dict }}
+{{- $poolsList := list }}
+{{- if kindIs "slice" $pools }}
+  {{- /* Already an array, return as-is */}}
+  {{- $poolsList = $pools }}
+{{- else if kindIs "map" $pools }}
+  {{- /* Dictionary format - need to convert to array */}}
+  {{- /* Sort keys numerically and build array */}}
+  {{- $keys := keys $pools | sortAlpha }}
+  {{- range $key := $keys }}
+    {{- $pool := index $pools $key }}
+    {{- $poolsList = append $poolsList $pool }}
+  {{- end }}
+{{- end }}
+{{- $poolsList | toYaml }}
 {{- end }}
 
 {{/*
-Common labels
-*/}}
-{{- define "minio-aistor.labels" -}}
-helm.sh/chart: {{ include "minio-aistor.chart" . }}
-{{ include "minio-aistor.selectorLabels" . }}
-{{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-{{- end }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- end }}
+Get the first pool, handling both dictionary and array formats.
+This is a convenience helper for accessing pool 0 properties.
 
-{{/*
-Selector labels
+Usage:
+  {{- $firstPool := include "minio-aistor.firstPool" . | fromYaml }}
+  servers: {{ $firstPool.servers }}
 */}}
-{{- define "minio-aistor.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "minio-aistor.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
+{{- define "minio-aistor.firstPool" -}}
+{{- $pools := index .Values "aistor-objectstore" "objectStore" "pools" | default dict }}
+{{- if kindIs "slice" $pools }}
+  {{- /* Array format - index directly */}}
+  {{- if gt (len $pools) 0 }}
+    {{- index $pools 0 | toYaml }}
+  {{- else }}
+    {{- dict | toYaml }}
+  {{- end }}
+{{- else if kindIs "map" $pools }}
+  {{- /* Dictionary format - get key "0" */}}
+  {{- if hasKey $pools "0" }}
+    {{- index $pools "0" | toYaml }}
+  {{- else }}
+    {{- dict | toYaml }}
+  {{- end }}
+{{- else }}
+  {{- dict | toYaml }}
+{{- end }}
 {{- end }}

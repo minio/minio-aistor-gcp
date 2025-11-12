@@ -66,15 +66,9 @@ export MINIO_SERVERS=4
 export MINIO_VOLUMES_PER_SERVER=4
 export MINIO_STORAGE_SIZE="10Gi"
 
-# Resource configuration
-export MINIO_MEMORY_REQUEST="2Gi"
-export MINIO_CPU_REQUEST="1000m"
-export MINIO_MEMORY_LIMIT="4Gi"
-export MINIO_CPU_LIMIT="2000m"
-
-# Service types (LoadBalancer, ClusterIP, or NodePort)
-export SERVICE_TYPE_API="LoadBalancer"
-export SERVICE_TYPE_CONSOLE="LoadBalancer"
+# Note: Resource limits, service types, storage class, and other advanced
+# settings use Helm chart defaults and are not configurable via GCP Marketplace
+# schema. To customize these, deploy via Helm chart directly.
 ```
 
 ## Step 3: Create Namespace
@@ -156,7 +150,7 @@ spec:
   descriptor:
     type: "MinIO AIStor"
     version: "1.0.0"
-    description: "Enterprise Object Storage for AI/ML Workloads"
+    description: "High-Performance Object Storage for AI/ML Workloads"
     maintainers:
     - name: MinIO Inc
       url: https://min.io
@@ -230,18 +224,6 @@ spec:
           value: "${MINIO_VOLUMES_PER_SERVER}"
         - name: AISTOR_OBJECTSTORE_OBJECTSTORE_POOLS_0_SIZE
           value: "${MINIO_STORAGE_SIZE}"
-        - name: AISTOR_OBJECTSTORE_OBJECTSTORE_POOLS_0_RESOURCES_REQUESTS_MEMORY
-          value: "${MINIO_MEMORY_REQUEST}"
-        - name: AISTOR_OBJECTSTORE_OBJECTSTORE_POOLS_0_RESOURCES_REQUESTS_CPU
-          value: "${MINIO_CPU_REQUEST}"
-        - name: AISTOR_OBJECTSTORE_OBJECTSTORE_POOLS_0_RESOURCES_LIMITS_MEMORY
-          value: "${MINIO_MEMORY_LIMIT}"
-        - name: AISTOR_OBJECTSTORE_OBJECTSTORE_POOLS_0_RESOURCES_LIMITS_CPU
-          value: "${MINIO_CPU_LIMIT}"
-        - name: AISTOR_OBJECTSTORE_OBJECTSTORE_SERVICES_MINIO_SERVICETYPE
-          value: "${SERVICE_TYPE_API}"
-        - name: AISTOR_OBJECTSTORE_OBJECTSTORE_SERVICES_CONSOLE_SERVICETYPE
-          value: "${SERVICE_TYPE_CONSOLE}"
 EOF
 ```
 
@@ -373,16 +355,12 @@ kubectl logs -n ${NAMESPACE} ${APP_INSTANCE_NAME}-minio-aistor-pool-0-0 | grep -
 
 | Parameter | Environment Variable | Default | Description |
 |-----------|---------------------|---------|-------------|
-| Servers | `AISTOR_OBJECTSTORE_OBJECTSTORE_POOLS_0_SERVERS` | `4` | Number of MinIO servers |
-| Volumes per server | `AISTOR_OBJECTSTORE_OBJECTSTORE_POOLS_0_VOLUMESPERSERVER` | `4` | Storage volumes per server |
-| Storage size | `AISTOR_OBJECTSTORE_OBJECTSTORE_POOLS_0_SIZE` | `10Gi` | Size per volume |
-| Memory request | `AISTOR_OBJECTSTORE_OBJECTSTORE_POOLS_0_RESOURCES_REQUESTS_MEMORY` | `2Gi` | Memory request |
-| CPU request | `AISTOR_OBJECTSTORE_OBJECTSTORE_POOLS_0_RESOURCES_REQUESTS_CPU` | `1000m` | CPU request |
-| Memory limit | `AISTOR_OBJECTSTORE_OBJECTSTORE_POOLS_0_RESOURCES_LIMITS_MEMORY` | `4Gi` | Memory limit |
-| CPU limit | `AISTOR_OBJECTSTORE_OBJECTSTORE_POOLS_0_RESOURCES_LIMITS_CPU` | `2000m` | CPU limit |
+| Servers | `AISTOR_OBJECTSTORE_OBJECTSTORE_POOLS_0_SERVERS` | `4` | Number of MinIO servers (4-32) |
+| Volumes per server | `AISTOR_OBJECTSTORE_OBJECTSTORE_POOLS_0_VOLUMESPERSERVER` | `4` | Storage volumes per server (1-16) |
+| Storage size | `AISTOR_OBJECTSTORE_OBJECTSTORE_POOLS_0_SIZE` | `10Gi` | Size per volume (e.g., 10Gi, 100Gi, 1Ti) |
 | Access key | `AISTOR_OBJECTSTORE_SECRETS_ACCESSKEY` | `admin` | MinIO root username |
-| API service type | `AISTOR_OBJECTSTORE_OBJECTSTORE_SERVICES_MINIO_SERVICETYPE` | `LoadBalancer` | API service type |
-| Console service type | `AISTOR_OBJECTSTORE_OBJECTSTORE_SERVICES_CONSOLE_SERVICETYPE` | `LoadBalancer` | Console service type |
+
+**Note**: Resource limits (CPU/memory), service types (LoadBalancer/ClusterIP), storage class, and other advanced settings use Helm chart defaults (2Gi memory, 1 CPU per server, LoadBalancer services). To customize these settings, deploy using the Helm chart directly instead of the GCP Marketplace deployer.
 
 ## Troubleshooting
 

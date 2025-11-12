@@ -90,13 +90,13 @@ Test connection:
 ===================================================================================
 CLUSTER INFORMATION
 ===================================================================================
-
+{{- $firstPool := include "minio-aistor.firstPool" . | fromYaml }}
 Release Name:     {{ .Release.Name }}
 Namespace:        {{ .Release.Namespace }}
 Object Store:     {{ index .Values "aistor-objectstore" "objectStore" "name" }}
-Servers:          {{ index .Values "aistor-objectstore" "objectStore" "pools" 0 "servers" }}
-Volumes/Server:   {{ index .Values "aistor-objectstore" "objectStore" "pools" 0 "volumesPerServer" }}
-Storage/Volume:   {{ index .Values "aistor-objectstore" "objectStore" "pools" 0 "size" }}
+Servers:          {{ $firstPool.servers }}
+Volumes/Server:   {{ $firstPool.volumesPerServer }}
+Storage/Volume:   {{ $firstPool.size }}
 
 ===================================================================================
 DOCUMENTATION
