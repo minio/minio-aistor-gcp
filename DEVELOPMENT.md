@@ -193,22 +193,41 @@ docker tag gcr.io/minio-inc-public/minio-aistor/deployer:latest \
   gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0
 
 docker push gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0
+```
 
+> **⚠️ CRITICAL: Add GCP Marketplace OCI Annotation**
+>
+> After pushing, you **MUST** add the GCP Marketplace service annotation using `crane`.
+> This is **REQUIRED** for GCP Marketplace compliance. Without this annotation, you will get:
+> ```
+> Failed to process container images from schema file: Missing annotation
+> com.googleapis.cloudmarketplace.product.service.name in manifest of image
+> ```
+>
+> **Note**: Docker `LABEL` in Dockerfile does NOT work - GCP requires OCI manifest annotations.
+
+```bash
 # Add required GCP Marketplace OCI annotation using crane
-# This is REQUIRED for 2025+ compliance
-# IMPORTANT: Use --annotation (not --label) to add OCI annotations to the manifest
+# IMPORTANT: This MUST be done after docker push
 crane mutate gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0 \
   --annotation com.googleapis.cloudmarketplace.product.service.name="services/minio-aistor-objectstore.endpoints.minio-inc-public.cloud.goog" \
   --tag gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0
 
+# Verify the annotation was added
+crane manifest gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0 | grep -A2 annotations
+
 # Tag with minor version (GCP Marketplace requirement)
-crane tag gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0 1.0
+crane mutate gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0 \
+  --annotation com.googleapis.cloudmarketplace.product.service.name="services/minio-aistor-objectstore.endpoints.minio-inc-public.cloud.goog" \
+  --tag gcr.io/minio-inc-public/minio-aistor/deployer:1.0
 
 # Tag as latest
-crane tag gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0 latest
+crane mutate gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0 \
+  --annotation com.googleapis.cloudmarketplace.product.service.name="services/minio-aistor-objectstore.endpoints.minio-inc-public.cloud.goog" \
+  --tag gcr.io/minio-inc-public/minio-aistor/deployer:latest
 ```
 
-**Note**: You can install crane with:
+**Install crane:**
 ```bash
 # macOS
 brew install crane
@@ -426,32 +445,32 @@ kubectl describe pod <pod-name> -n <namespace>
 
 ### 2025 Compliance Requirements
 
-Starting January 20, 2025, all deployer images must include a service name annotation. This can be added in two ways:
+Starting January 20, 2025, all deployer images **MUST** include a service name annotation in the OCI manifest.
 
-#### Option 1: Add Label in Dockerfile (Build-time)
+> **⚠️ IMPORTANT: Docker LABEL Does NOT Work**
+>
+> GCP Marketplace requires **OCI manifest annotations**, NOT Docker labels.
+> - Docker `LABEL` adds metadata to the image **config** (Config.Labels)
+> - GCP Marketplace reads annotations from the image **manifest**
+> - You **MUST** use `crane mutate --annotation` to add the annotation
 
-**deployer/Dockerfile**:
-```dockerfile
-LABEL com.googleapis.cloudmarketplace.product.service.name="services/minio-aistor-objectstore.endpoints.minio-inc-public.cloud.goog"
-```
+#### Required: Add Annotation with Crane (Post-build)
 
-#### Option 2: Add Annotation with Crane (Post-build)
-
-After pushing the image to GCR, use `crane` to add the annotation:
+After pushing the image to GCR, use `crane` to add the OCI manifest annotation:
 
 ```bash
-# Install crane
+# Install crane (if not already installed)
 brew install crane  # macOS
 # or
 go install github.com/google/go-containerregistry/cmd/crane@latest  # Linux
 
-# Add OCI annotation to existing image (use --annotation, not --label)
+# Add OCI annotation to the image manifest
 crane mutate gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0 \
   --annotation com.googleapis.cloudmarketplace.product.service.name="services/minio-aistor-objectstore.endpoints.minio-inc-public.cloud.goog" \
   --tag gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0
 
 # Verify OCI annotation was added to the manifest
-docker buildx imagetools inspect gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0 --raw | grep -A 3 annotations
+crane manifest gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0 | grep -A2 annotations
 ```
 
 **Annotation Format**:
@@ -463,12 +482,19 @@ Where:
 - `product_id`: Your GCP Marketplace product ID (e.g., `minio-aistor-objectstore`)
 - `project_id`: Your GCP project ID (e.g., `minio-inc-public`)
 
-**Important Distinction - Labels vs Annotations:**
-- `--label`: Adds Docker labels to image **config** (stored in Config.Labels)
-- `--annotation`: Adds OCI annotations to image **manifest** (what GCP Marketplace requires)
-- GCP Marketplace requires **OCI annotations on the manifest**, not Docker labels
+**Error Without Annotation:**
+```
+Failed to process container images from schema file: Missing annotation
+com.googleapis.cloudmarketplace.product.service.name in manifest of image:
+gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0
+```
 
-**Note**: The crane method is preferred as it doesn't require rebuilding the image and can be applied after the fact.
+**Labels vs Annotations - Key Difference:**
+| Method | Location | GCP Marketplace |
+|--------|----------|-----------------|
+| `LABEL` in Dockerfile | Image config (Config.Labels) | ❌ NOT recognized |
+| `crane mutate --label` | Image config (Config.Labels) | ❌ NOT recognized |
+| `crane mutate --annotation` | OCI manifest | ✅ **REQUIRED** |
 
 See: https://cloud.google.com/marketplace/docs/partners/migrations/container-image-annotations
 
