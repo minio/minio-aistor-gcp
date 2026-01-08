@@ -8,10 +8,6 @@ operator:
 objectstore:
   enabled: true
 
-# MinIO AIStor License (required - user must provide)
-# This will be populated from schema.yaml during deployment
-license: ""
-
 # GCP Marketplace specific settings
 deployer:
   image: gcr.io/cloud-marketplace-tools/k8s/deployer_helm:latest
@@ -25,7 +21,7 @@ tls:
 
 # Configuration for aistor-objectstore-operator subchart
 aistor-objectstore-operator:
-  # License will be passed from parent
+  # License is set directly from schema.yaml via aistor-objectstore-operator.license
   license: ""
 
   global:

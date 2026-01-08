@@ -81,7 +81,7 @@ properties:
     description: The Kubernetes namespace where MinIO AIStor will be deployed
 
   # MinIO AIStor License (REQUIRED)
-  license:
+  aistor-objectstore-operator.license:
     type: string
     title: AIStor License Key
     description: |
@@ -179,7 +179,7 @@ properties:
 required:
 - name
 - namespace
-- license
+- aistor-objectstore-operator.license
 - aistor-objectstore.objectStore.pools.0.servers
 - aistor-objectstore.objectStore.pools.0.name
 - aistor-objectstore.objectStore.pools.0.volumesPerServer
