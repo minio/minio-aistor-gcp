@@ -6,7 +6,7 @@ metadata:
   annotations:
     kubernetes-engine.cloud.google.com/icon: >-
       data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==
-    marketplace.cloud.google.com/deploy-info: '{"partner_id": "minio-inc-public", "product_id": "minio-aistor-objectstore", "partner_name": "MinIO Inc"}'
+    marketplace.cloud.google.com/deploy-info: '{"partner_id": "minio-inc-public", "product_id": "aistor", "partner_name": "MinIO Inc"}'
   labels:
     app.kubernetes.io/name: "{{ .Release.Name }}"
     app.kubernetes.io/version: "{{ .Chart.AppVersion }}"
@@ -63,12 +63,12 @@ spec:
       Get your root access credentials:
       ```bash
       # Access Key (username)
-      kubectl get secret {{ index .Values "aistor-objectstore" "secrets" "name" }} \
+      kubectl get secret {{ .Release.Name }}-env-config \
         -n {{ .Release.Namespace }} \
         -o jsonpath='{.data.config\.env}' | base64 -d | grep MINIO_ROOT_USER
 
       # Secret Key (password)
-      kubectl get secret {{ index .Values "aistor-objectstore" "secrets" "name" }} \
+      kubectl get secret {{ .Release.Name }}-env-config \
         -n {{ .Release.Namespace }} \
         -o jsonpath='{.data.config\.env}' | base64 -d | grep MINIO_ROOT_PASSWORD
       ```
@@ -83,58 +83,24 @@ spec:
       Check object store status:
       ```bash
       kubectl get objectstore -n {{ .Release.Namespace }}
-      kubectl get pods -n {{ .Release.Namespace }} -l app={{ index .Values "aistor-objectstore" "objectStore" "name" }}
+      kubectl get pods -n {{ .Release.Namespace }} -l app={{ .Release.Name }}-store
       ```
 
       ## Access MinIO Console
 
-      {{- $consoleServiceType := index .Values "aistor-objectstore" "objectStore" "services" "console" "serviceType" }}
-      {{- if eq $consoleServiceType "LoadBalancer" }}
       Wait for LoadBalancer external IP:
       ```bash
-      kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/console={{ index .Values "aistor-objectstore" "objectStore" "name" }}
+      kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/console={{ .Release.Name }}-store
       ```
       Access via: http://<EXTERNAL-IP>
-      {{- else if eq $consoleServiceType "NodePort" }}
-      Get NodePort:
-      ```bash
-      kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/console={{ index .Values "aistor-objectstore" "objectStore" "name" }}
-      ```
-      Access via: http://<NODE-IP>:<NODE-PORT>
-      {{- else }}
-      Port-forward to access locally:
-      ```bash
-      kubectl port-forward -n {{ .Release.Namespace }} \
-        svc/$(kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/console={{ index .Values "aistor-objectstore" "objectStore" "name" }} -o name | head -1) \
-        9001:9001
-      ```
-      Access via: http://localhost:9001
-      {{- end }}
 
       ## Access MinIO API (S3 Endpoint)
 
-      {{- $minioServiceType := index .Values "aistor-objectstore" "objectStore" "services" "minio" "serviceType" }}
-      {{- if eq $minioServiceType "LoadBalancer" }}
       Wait for LoadBalancer external IP:
       ```bash
-      kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/tenant={{ index .Values "aistor-objectstore" "objectStore" "name" }}
+      kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/tenant={{ .Release.Name }}-store
       ```
       S3 Endpoint: http://<EXTERNAL-IP>:9000
-      {{- else if eq $minioServiceType "NodePort" }}
-      Get NodePort:
-      ```bash
-      kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/tenant={{ index .Values "aistor-objectstore" "objectStore" "name" }}
-      ```
-      S3 Endpoint: http://<NODE-IP>:<NODE-PORT>
-      {{- else }}
-      Port-forward to access locally:
-      ```bash
-      kubectl port-forward -n {{ .Release.Namespace }} \
-        svc/$(kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/tenant={{ index .Values "aistor-objectstore" "objectStore" "name" }} -o name | head -1) \
-        9000:9000
-      ```
-      S3 Endpoint: http://localhost:9000
-      {{- end }}
 
       ## Using MinIO Client (mc)
 
@@ -156,12 +122,12 @@ spec:
   - name: Operator Status
     value: Check with 'kubectl get pods -l app.kubernetes.io/name=aistor-objectstore-operator'
   - name: Object Store Name
-    value: {{ index .Values "aistor-objectstore" "objectStore" "name" }}
-  {{- $firstPool := include "minio-aistor.firstPool" . | fromYaml }}
+    value: {{ .Release.Name }}-store
+  {{- $firstPool := index .Values.objectstore.pools "0" }}
   - name: Replicas
-    value: {{ $firstPool.servers | quote }}
+    value: {{ $firstPool.servers | default 1 | quote }}
   - name: Storage per Volume
-    value: {{ $firstPool.size }}
+    value: {{ $firstPool.size | default "10Gi" }}
   selector:
     matchLabels:
       app.kubernetes.io/name: "{{ .Release.Name }}"

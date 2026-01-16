@@ -1,32 +1,43 @@
 .PHONY: help
 help:
 	@echo "Available targets:"
-	@echo "  deps            - Download Helm chart dependencies"
-	@echo "  build           - Build the deployer image"
-	@echo "  push            - Push images to GCR"
-	@echo "  verify          - Verify the app package"
-	@echo "  install         - Install the app using mpdev (requires LICENSE_KEY)"
-	@echo "  uninstall       - Uninstall the app"
-	@echo "  clean           - Clean up local resources"
-	@echo "  lint            - Lint the Helm chart"
-	@echo "  template        - Test Helm template rendering"
+	@echo "  deps                 - Download Helm chart dependencies"
+	@echo "  build                - Build the deployer image"
+	@echo "  build-reporter       - Build the usage-reporter image"
+	@echo "  build-all            - Build all images"
+	@echo "  push                 - Push deployer image to GCR"
+	@echo "  push-reporter        - Push usage-reporter image to GCR"
+	@echo "  push-all             - Push all images to GCR"
+	@echo "  release              - Build, push, and annotate all images (VERSION required)"
+	@echo "  verify               - Verify the app package"
+	@echo "  install              - Install the app using mpdev (requires LICENSE_KEY)"
+	@echo "  uninstall            - Uninstall the app"
+	@echo "  clean                - Clean up local resources"
+	@echo "  lint                 - Lint the Helm chart"
+	@echo "  template             - Test Helm template rendering"
 
 # Configuration variables
 REGISTRY ?= gcr.io/minio-inc-public
 APP_NAME = minio-aistor
+PRODUCT_ID = aistor
 TAG ?= latest
+VERSION ?= 1.0.0
 MARKETPLACE_TOOLS_TAG ?= 0.12.10
 
 # License (must be provided for installation)
 LICENSE_KEY ?=
 
 # Image names
-DEPLOYER_IMAGE = $(REGISTRY)/$(APP_NAME)/deployer:$(TAG)
+DEPLOYER_IMAGE = $(REGISTRY)/$(PRODUCT_ID)/deployer:$(TAG)
+REPORTER_IMAGE = $(REGISTRY)/$(PRODUCT_ID)/usage-reporter:$(TAG)
+
+# GCP Marketplace service annotation
+SERVICE_ANNOTATION = services/$(PRODUCT_ID).endpoints.minio-inc-public.cloud.goog
 
 .PHONY: deps
 deps:
 	@echo "Downloading Helm chart dependencies..."
-	cd chart/$(APP_NAME) && helm repo add aistor https://helm.min.io/ && helm repo update
+	cd chart/$(APP_NAME) && helm repo add aistor https://helm.min.io/ 2>/dev/null || true && helm repo update
 	cd chart/$(APP_NAME) && helm dependency update
 
 .PHONY: build
@@ -38,10 +49,69 @@ build: deps
 		-f deployer/Dockerfile \
 		.
 
+.PHONY: build-reporter
+build-reporter:
+	@echo "Building usage-reporter image..."
+	docker build \
+		--tag $(REPORTER_IMAGE) \
+		-f images/usage-reporter/Dockerfile \
+		images/usage-reporter/
+
+.PHONY: build-all
+build-all: build build-reporter
+
 .PHONY: push
 push:
 	@echo "Pushing deployer image to $(DEPLOYER_IMAGE)..."
 	docker push $(DEPLOYER_IMAGE)
+
+.PHONY: push-reporter
+push-reporter:
+	@echo "Pushing usage-reporter image to $(REPORTER_IMAGE)..."
+	docker push $(REPORTER_IMAGE)
+
+.PHONY: push-all
+push-all: push push-reporter
+
+.PHONY: release
+release:
+	@echo "Building and releasing version $(VERSION)..."
+	# Build deployer
+	docker build \
+		--build-arg MARKETPLACE_TOOLS_TAG=$(MARKETPLACE_TOOLS_TAG) \
+		--tag $(REGISTRY)/$(PRODUCT_ID)/deployer:$(VERSION) \
+		--tag $(REGISTRY)/$(PRODUCT_ID)/deployer:$(shell echo $(VERSION) | cut -d. -f1,2) \
+		--tag $(REGISTRY)/$(PRODUCT_ID)/deployer:latest \
+		-f deployer/Dockerfile \
+		.
+	# Build usage-reporter
+	docker build \
+		--tag $(REGISTRY)/$(PRODUCT_ID)/usage-reporter:$(VERSION) \
+		--tag $(REGISTRY)/$(PRODUCT_ID)/usage-reporter:$(shell echo $(VERSION) | cut -d. -f1,2) \
+		--tag $(REGISTRY)/$(PRODUCT_ID)/usage-reporter:latest \
+		-f images/usage-reporter/Dockerfile \
+		images/usage-reporter/
+	# Push all tags
+	docker push $(REGISTRY)/$(PRODUCT_ID)/deployer:$(VERSION)
+	docker push $(REGISTRY)/$(PRODUCT_ID)/deployer:$(shell echo $(VERSION) | cut -d. -f1,2)
+	docker push $(REGISTRY)/$(PRODUCT_ID)/deployer:latest
+	docker push $(REGISTRY)/$(PRODUCT_ID)/usage-reporter:$(VERSION)
+	docker push $(REGISTRY)/$(PRODUCT_ID)/usage-reporter:$(shell echo $(VERSION) | cut -d. -f1,2)
+	docker push $(REGISTRY)/$(PRODUCT_ID)/usage-reporter:latest
+	# Add OCI annotations for GCP Marketplace (deployer only)
+	crane mutate $(REGISTRY)/$(PRODUCT_ID)/deployer:$(VERSION) \
+		--annotation com.googleapis.cloudmarketplace.product.service.name="$(SERVICE_ANNOTATION)" \
+		--tag $(REGISTRY)/$(PRODUCT_ID)/deployer:$(VERSION)
+	crane mutate $(REGISTRY)/$(PRODUCT_ID)/deployer:$(VERSION) \
+		--annotation com.googleapis.cloudmarketplace.product.service.name="$(SERVICE_ANNOTATION)" \
+		--tag $(REGISTRY)/$(PRODUCT_ID)/deployer:$(shell echo $(VERSION) | cut -d. -f1,2)
+	crane mutate $(REGISTRY)/$(PRODUCT_ID)/deployer:$(VERSION) \
+		--annotation com.googleapis.cloudmarketplace.product.service.name="$(SERVICE_ANNOTATION)" \
+		--tag $(REGISTRY)/$(PRODUCT_ID)/deployer:latest
+	@echo "Release $(VERSION) complete!"
+	@echo "Images:"
+	@echo "  - $(REGISTRY)/$(PRODUCT_ID)/deployer:$(VERSION)"
+	@echo "  - $(REGISTRY)/$(PRODUCT_ID)/usage-reporter:$(VERSION)"
 
 .PHONY: verify
 verify: deps
@@ -58,7 +128,7 @@ install:
 	@echo "Installing MinIO AIStor with operator..."
 	mpdev install \
 		--deployer=$(DEPLOYER_IMAGE) \
-		--parameters='{"name": "$(APP_NAME)", "namespace": "$(APP_NAME)", "license": "$(LICENSE_KEY)", "aistor-objectstore.objectStore.pools[0].servers": 4, "aistor-objectstore.objectStore.pools[0].size": "10Gi"}'
+		--parameters='{"name": "$(APP_NAME)", "namespace": "$(APP_NAME)", "aistor-operator.license": "$(LICENSE_KEY)", "reportingSecret": "gs://cloud-marketplace-tools/reporting_secrets/fake_reporting_secret.yaml", "objectstore.pools.0.servers": 1, "objectstore.pools.0.volumesPerServer": 4, "objectstore.pools.0.size": "10Gi"}'
 
 .PHONY: uninstall
 uninstall:
@@ -76,6 +146,7 @@ test:
 clean:
 	@echo "Cleaning up..."
 	docker rmi $(DEPLOYER_IMAGE) || true
+	docker rmi $(REPORTER_IMAGE) || true
 	cd chart/$(APP_NAME) && rm -rf charts/*.tgz charts Chart.lock
 
 .PHONY: setup-mpdev

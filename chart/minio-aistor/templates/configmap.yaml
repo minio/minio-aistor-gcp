@@ -1,5 +1,6 @@
-{{- if .Values.reportingSecret }}
-{{- $firstPool := include "minio-aistor.firstPool" . | fromYaml }}
+{{- if .Values.objectstore.enabled }}
+---
+# UBBAgent Configuration for GCP Marketplace Usage-Based Billing
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,24 +8,112 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/component: billing
 data:
   config.yaml: |
+    # UBBAgent configuration for MinIO AIStor storage billing
+    identities:
+    - name: gcp
+      gcp:
+        # Service account key from reporting secret (base64 encoded)
+        encodedServiceAccountKey: ${AGENT_ENCODED_KEY}
+
     metrics:
-    - name: storage_capacity
+    - name: {{ .Values.billing.metricName }}
       type: int
       endpoints:
-      - name: disk
-        resource:
-          name: {{ .Release.Name }}
+      - name: servicecontrol
+      # passthrough sends reports immediately without aggregation
       passthrough: {}
 
-    sources:
-    - name: storage_capacity_source
-      heartbeat:
-        metric: storage_capacity
-        value:
-          int64Value: {{ $firstPool.servers | default 4 }}
-
     endpoints:
-      - name: servicecontrol
+    - name: servicecontrol
+      servicecontrol:
+        identity: gcp
+        serviceName: {{ .Values.billing.serviceName }}
+        consumerId: ${AGENT_CONSUMER_ID}
+
+---
+# Reporter Script for collecting and reporting MinIO storage usage
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-reporter-scripts
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/component: billing
+data:
+  report-usage.sh: |
+    #!/bin/sh
+    set -e
+
+    log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $1"; }
+
+    # Configuration
+    MIN_GIB={{ .Values.billing.minimumGiB }}
+    TODAY=$(date -u +%Y-%m-%d)
+    YESTERDAY=$(date -u -d @$(($(date -u +%s) - 86400)) +%Y-%m-%d)
+
+    log "Starting usage report for ${YESTERDAY}"
+
+    # Load MinIO credentials and set MC_HOST
+    . /minio-config/config.env
+    export MC_HOST_minio="http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@localhost:9000"
+
+    # Get storage usage in GiB (default to minimum if unavailable)
+    STORAGE_BYTES=$(mc admin info minio --json 2>/dev/null | jq -r '.info.usage.size // 0')
+    ACTUAL_GIB=$((${STORAGE_BYTES:-0} / 1073741824))
+
+    # Apply minimum billing (1 TiB = 1024 GiB)
+    if [ "$ACTUAL_GIB" -lt "$MIN_GIB" ]; then
+      REPORT_GIB=$MIN_GIB
+      log "Actual: ${ACTUAL_GIB} GiB, reporting minimum: ${REPORT_GIB} GiB"
+    else
+      REPORT_GIB=$ACTUAL_GIB
+      log "Storage usage: ${REPORT_GIB} GiB"
+    fi
+
+    # Send report to UBBAgent
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:4567/report" \
+      -H "Content-Type: application/json" \
+      -d "{\"name\":\"{{ .Values.billing.metricName }}\",\"startTime\":\"${YESTERDAY}T00:00:00Z\",\"endTime\":\"${TODAY}T00:00:00Z\",\"value\":{\"int64Value\":${REPORT_GIB}}}")
+
+    log "Report sent (HTTP ${HTTP_CODE})"
+
+  start-cron.sh: |
+    #!/bin/sh
+    # Daily usage reporter - runs at configured hour (default: 1 AM UTC)
+
+    log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $1"; }
+
+    wait_for() {
+      log "Waiting for $1..."
+      for i in $(seq 1 $3); do
+        curl -s "$2" >/dev/null 2>&1 && log "$1 is ready" && return 0
+        sleep 10
+      done
+      log "WARNING: $1 not ready after timeout"
+    }
+
+    REPORT_HOUR="{{ .Values.billing.reportHour | default 1 }}"
+    log "MinIO Usage Reporter starting (daily at ${REPORT_HOUR}:00 UTC)"
+
+    wait_for "MinIO" "http://localhost:9000/minio/health/live" 30
+    wait_for "UBBAgent" "http://localhost:4567/status" 12
+
+    while true; do
+      # Calculate seconds until next report hour
+      H=$(date -u +%-H) M=$(date -u +%-M) S=$(date -u +%-S)
+      [ "$H" -lt "$REPORT_HOUR" ] && HOURS=$((REPORT_HOUR - H)) || HOURS=$((24 - H + REPORT_HOUR))
+      SLEEP=$((HOURS * 3600 - M * 60 - S))
+
+      log "Next report in ${SLEEP} seconds"
+      sleep ${SLEEP}
+
+      log "Running daily report..."
+      /scripts/report-usage.sh || true
+
+      sleep 60
+    done
 {{- end }}

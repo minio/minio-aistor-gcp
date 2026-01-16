@@ -93,12 +93,12 @@ REGISTRY ?= gcr.io/minio-inc-public
 
 **schema.yaml** (Line ~10):
 ```yaml
-marketplace.cloud.google.com/deploy-info: '{"partner_id": "minio-inc-public", "product_id": "minio-aistor-objectstore"}'
+marketplace.cloud.google.com/deploy-info: '{"partner_id": "minio-inc-public", "product_id": "aistor"}'
 ```
 
 **chart/minio-aistor/templates/application.yaml** (Line ~9):
 ```yaml
-marketplace.cloud.google.com/deploy-info: '{"partner_id": "minio-inc-public", "product_id": "minio-aistor-objectstore"}'
+marketplace.cloud.google.com/deploy-info: '{"partner_id": "minio-inc-public", "product_id": "aistor"}'
 ```
 
 ## Development Workflow
@@ -148,7 +148,7 @@ make template
 make build
 
 # This creates:
-# - gcr.io/minio-inc-public/minio-aistor/deployer:latest
+# - gcr.io/minio-inc-public/aistor/deployer:latest
 ```
 
 ### Step 5: Test Locally
@@ -159,7 +159,7 @@ export LICENSE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
 make install LICENSE_KEY="${LICENSE_KEY}"
 
 # Option 2: Manual extraction and testing
-docker create --name temp-deployer gcr.io/minio-inc-public/minio-aistor/deployer:latest
+docker create --name temp-deployer gcr.io/minio-inc-public/aistor/deployer:latest
 docker cp temp-deployer:/data/chart ./extracted-chart
 docker rm temp-deployer
 
@@ -189,10 +189,10 @@ Once tests pass:
 make push
 
 # Tag with version
-docker tag gcr.io/minio-inc-public/minio-aistor/deployer:latest \
-  gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0
+docker tag gcr.io/minio-inc-public/aistor/deployer:latest \
+  gcr.io/minio-inc-public/aistor/deployer:1.0.0
 
-docker push gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0
+docker push gcr.io/minio-inc-public/aistor/deployer:1.0.0
 ```
 
 > **⚠️ CRITICAL: Add GCP Marketplace OCI Annotation**
@@ -209,22 +209,22 @@ docker push gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0
 ```bash
 # Add required GCP Marketplace OCI annotation using crane
 # IMPORTANT: This MUST be done after docker push
-crane mutate gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0 \
-  --annotation com.googleapis.cloudmarketplace.product.service.name="services/minio-aistor-objectstore.endpoints.minio-inc-public.cloud.goog" \
-  --tag gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0
+crane mutate gcr.io/minio-inc-public/aistor/deployer:1.0.0 \
+  --annotation com.googleapis.cloudmarketplace.product.service.name="services/aistor.endpoints.minio-inc-public.cloud.goog" \
+  --tag gcr.io/minio-inc-public/aistor/deployer:1.0.0
 
 # Verify the annotation was added
-crane manifest gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0 | grep -A2 annotations
+crane manifest gcr.io/minio-inc-public/aistor/deployer:1.0.0 | grep -A2 annotations
 
 # Tag with minor version (GCP Marketplace requirement)
-crane mutate gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0 \
-  --annotation com.googleapis.cloudmarketplace.product.service.name="services/minio-aistor-objectstore.endpoints.minio-inc-public.cloud.goog" \
-  --tag gcr.io/minio-inc-public/minio-aistor/deployer:1.0
+crane mutate gcr.io/minio-inc-public/aistor/deployer:1.0.0 \
+  --annotation com.googleapis.cloudmarketplace.product.service.name="services/aistor.endpoints.minio-inc-public.cloud.goog" \
+  --tag gcr.io/minio-inc-public/aistor/deployer:1.0
 
 # Tag as latest
-crane mutate gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0 \
-  --annotation com.googleapis.cloudmarketplace.product.service.name="services/minio-aistor-objectstore.endpoints.minio-inc-public.cloud.goog" \
-  --tag gcr.io/minio-inc-public/minio-aistor/deployer:latest
+crane mutate gcr.io/minio-inc-public/aistor/deployer:1.0.0 \
+  --annotation com.googleapis.cloudmarketplace.product.service.name="services/aistor.endpoints.minio-inc-public.cloud.goog" \
+  --tag gcr.io/minio-inc-public/aistor/deployer:latest
 ```
 
 **Install crane:**
@@ -251,17 +251,56 @@ kubectl delete namespace test-ns
 
 ## Makefile Commands Reference
 
+### Build Commands
+
 | Command | Description |
 |---------|-------------|
 | `make deps` | Download Helm chart dependencies |
-| `make lint` | Lint Helm chart for errors |
-| `make template` | Render templates to /tmp/rendered-templates.yaml |
 | `make build` | Build deployer Docker image |
+| `make build-reporter` | Build usage-reporter Docker image |
+| `make build-all` | Build all images (deployer + usage-reporter) |
+
+### Push Commands
+
+| Command | Description |
+|---------|-------------|
 | `make push` | Push deployer image to GCR |
+| `make push-reporter` | Push usage-reporter image to GCR |
+| `make push-all` | Push all images to GCR |
+
+### Release Command
+
+| Command | Description |
+|---------|-------------|
+| `make release VERSION=x.y.z` | Build, push, and annotate all images |
+
+The `release` command:
+1. Builds both images with tags: `VERSION`, `MAJOR.MINOR`, `latest`
+2. Pushes all tags to GCR
+3. Adds OCI annotations for GCP Marketplace (deployer only)
+
+Example:
+```bash
+make release VERSION=1.0.0
+# Creates: deployer:1.0.0, deployer:1.0, deployer:latest
+#          usage-reporter:1.0.0, usage-reporter:1.0, usage-reporter:latest
+```
+
+### Development Commands
+
+| Command | Description |
+|---------|-------------|
+| `make lint` | Lint Helm chart for errors |
+| `make template` | Render templates for testing |
 | `make verify` | Run mpdev verification |
-| `make install` | Install using mpdev (requires LICENSE_KEY) |
+| `make install LICENSE_KEY=...` | Install using mpdev |
 | `make uninstall` | Uninstall test deployment |
 | `make clean` | Remove local Docker images |
+
+### Debugging Commands
+
+| Command | Description |
+|---------|-------------|
 | `make check-operator` | Check operator pod status |
 | `make check-objectstore` | Check objectstore pod status |
 | `make get-credentials` | Retrieve MinIO credentials |
@@ -337,25 +376,25 @@ cat /tmp/mpdev-verify.log
 4. Build, tag, and annotate:
    ```bash
    make build
-   docker tag gcr.io/minio-inc-public/minio-aistor/deployer:latest \
-     gcr.io/minio-inc-public/minio-aistor/deployer:1.0.1
-   docker push gcr.io/minio-inc-public/minio-aistor/deployer:1.0.1
+   docker tag gcr.io/minio-inc-public/aistor/deployer:latest \
+     gcr.io/minio-inc-public/aistor/deployer:1.0.1
+   docker push gcr.io/minio-inc-public/aistor/deployer:1.0.1
 
    # Add required GCP Marketplace OCI annotation
    # IMPORTANT: Use --annotation (not --label) to add OCI annotations
-   crane mutate gcr.io/minio-inc-public/minio-aistor/deployer:1.0.1 \
-     --annotation com.googleapis.cloudmarketplace.product.service.name="services/minio-aistor-objectstore.endpoints.minio-inc-public.cloud.goog" \
-     --tag gcr.io/minio-inc-public/minio-aistor/deployer:1.0.1
+   crane mutate gcr.io/minio-inc-public/aistor/deployer:1.0.1 \
+     --annotation com.googleapis.cloudmarketplace.product.service.name="services/aistor.endpoints.minio-inc-public.cloud.goog" \
+     --tag gcr.io/minio-inc-public/aistor/deployer:1.0.1
 
    # Tag with minor version and latest
-   crane tag gcr.io/minio-inc-public/minio-aistor/deployer:1.0.1 1.0
-   crane tag gcr.io/minio-inc-public/minio-aistor/deployer:1.0.1 latest
+   crane tag gcr.io/minio-inc-public/aistor/deployer:1.0.1 1.0
+   crane tag gcr.io/minio-inc-public/aistor/deployer:1.0.1 latest
    ```
 
 5. Update in Partner Hub:
    - Navigate to product listing
    - Click "Add Version"
-   - Specify deployer image: `gcr.io/minio-inc-public/minio-aistor/deployer:1.0`
+   - Specify deployer image: `gcr.io/minio-inc-public/aistor/deployer:1.0`
    - Add release notes
    - Submit for review
 
@@ -424,6 +463,44 @@ helm lint ./chart/minio-aistor --values test-values.yaml
 - Check license expiration: Decode JWT at jwt.io
 - Request new test license from MinIO
 
+### Issue: ObjectStore shows "license has expired" warning
+
+**Cause**: The FREE plan license or test license may show expiration warnings
+
+**Solution**:
+- This is typically just a warning - the deployment will still work
+- Check ObjectStore health: `kubectl get objectstore -n <namespace>`
+- If health shows "green", the deployment is functional
+- For production, use a valid enterprise license
+
+### Issue: Webhook pod CrashLoopBackOff on GKE Autopilot
+
+**Cause**: GKE Autopilot blocks CSRs (Certificate Signing Requests) with `system:` prefixes. The `object-store-webhook` pod tries to generate TLS certificates using Kubernetes CSR API with CN like `system:node:object-store-webhook.minio-aistor.svc`, which is rejected by GKE Warden.
+
+**Error message**:
+```
+admission webhook "warden-validating.common-webhooks.networking.gke.io" denied the request:
+GKE Warden rejected the request because it violates one or more constraints.
+Violations details: {"[denied by autogke-csr-limitation]":["Creating CSRs which use a
+username with 'system:' prefix for the common name are not allowed..."]}
+```
+
+**Solution**:
+The webhook is optional for basic MinIO functionality. Delete the MutatingWebhookConfiguration to allow pods to be created:
+
+```bash
+# Delete the webhook configuration
+kubectl delete mutatingwebhookconfiguration object-store-operator-webhook
+
+# Scale down the webhook deployment (optional, saves resources)
+kubectl scale deployment object-store-webhook -n <namespace> --replicas=0
+
+# Restart the StatefulSet to trigger pod creation
+kubectl rollout restart sts <statefulset-name> -n <namespace>
+```
+
+**Note**: The webhook provides pod mutation features (rack awareness, etc.) which won't be available after deletion. For most deployments, this is acceptable.
+
 ### Issue: Pods stuck in Pending
 
 **Cause**: Insufficient cluster resources
@@ -465,12 +542,12 @@ brew install crane  # macOS
 go install github.com/google/go-containerregistry/cmd/crane@latest  # Linux
 
 # Add OCI annotation to the image manifest
-crane mutate gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0 \
-  --annotation com.googleapis.cloudmarketplace.product.service.name="services/minio-aistor-objectstore.endpoints.minio-inc-public.cloud.goog" \
-  --tag gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0
+crane mutate gcr.io/minio-inc-public/aistor/deployer:1.0.0 \
+  --annotation com.googleapis.cloudmarketplace.product.service.name="services/aistor.endpoints.minio-inc-public.cloud.goog" \
+  --tag gcr.io/minio-inc-public/aistor/deployer:1.0.0
 
 # Verify OCI annotation was added to the manifest
-crane manifest gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0 | grep -A2 annotations
+crane manifest gcr.io/minio-inc-public/aistor/deployer:1.0.0 | grep -A2 annotations
 ```
 
 **Annotation Format**:
@@ -479,14 +556,14 @@ services/<product_id>.endpoints.<project_id>.cloud.goog
 ```
 
 Where:
-- `product_id`: Your GCP Marketplace product ID (e.g., `minio-aistor-objectstore`)
+- `product_id`: Your GCP Marketplace product ID (e.g., `aistor`)
 - `project_id`: Your GCP project ID (e.g., `minio-inc-public`)
 
 **Error Without Annotation:**
 ```
 Failed to process container images from schema file: Missing annotation
 com.googleapis.cloudmarketplace.product.service.name in manifest of image:
-gcr.io/minio-inc-public/minio-aistor/deployer:1.0.0
+gcr.io/minio-inc-public/aistor/deployer:1.0.0
 ```
 
 **Labels vs Annotations - Key Difference:**
@@ -520,6 +597,95 @@ See: https://cloud.google.com/marketplace/docs/partners/migrations/container-ima
 - [ ] S3 operations verified
 - [ ] CLI deployment instructions tested
 - [ ] All documentation up to date
+
+## Usage-Based Billing
+
+MinIO AIStor reports storage usage to GCP Marketplace for billing via two sidecars injected into the MinIO pod.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  MinIO Pod                                                  │
+│  ┌─────────────────┐                                        │
+│  │  MinIO Server   │◀──── localhost:9000                    │
+│  └─────────────────┘                                        │
+│           │                                                 │
+│           │ mc admin info                                   │
+│           ▼                                                 │
+│  ┌─────────────────┐     POST /report    ┌───────────────┐  │
+│  │ Usage Reporter  │────────────────────▶│   UBBAgent    │  │
+│  │   (sidecar)     │                     │   (sidecar)   │  │
+│  └─────────────────┘                     └───────┬───────┘  │
+│                                                  │          │
+└──────────────────────────────────────────────────┼──────────┘
+                                                   │
+                                                   ▼
+                                    ┌──────────────────────────┐
+                                    │  Google Service Control  │
+                                    │        (Billing)         │
+                                    └──────────────────────────┘
+```
+
+### Components
+
+| Component | Description |
+|-----------|-------------|
+| **UBBAgent** | GCP Marketplace metering agent (`gcr.io/cloud-marketplace-tools/metering/ubbagent`) |
+| **Usage Reporter** | Queries MinIO storage and reports to UBBAgent daily |
+| **Reporting Secret** | Created by GCP Marketplace with billing credentials |
+
+### Billing Configuration
+
+Configured in `values.yaml`:
+
+```yaml
+billing:
+  serviceName: "aistor.mp-minio-inc-public.appspot.com"
+  metricName: "minio_usage"
+  minimumGiB: 1024        # 1 TiB minimum
+  reportHour: 1           # Report at 1 AM UTC
+```
+
+### How It Works
+
+- **Reporting schedule**: Daily at configured hour (default 1 AM UTC)
+- **Metric**: Storage usage in GiB
+- **Minimum billing**: 1 TiB (1024 GiB) - usage below this is billed at minimum
+
+| Actual Usage | Reported GiB/day |
+|--------------|------------------|
+| 100 GiB | 1024 (minimum) |
+| 500 GiB | 1024 (minimum) |
+| 2 TiB | 2048 |
+
+### Monitoring
+
+```bash
+# Check usage-reporter logs
+kubectl logs <minio-pod> -c usage-reporter -n minio-aistor
+
+# Check UBBAgent status
+kubectl exec <minio-pod> -c ubbagent -n minio-aistor -- curl -s localhost:4567/status
+
+# Check UBBAgent logs
+kubectl logs <minio-pod> -c ubbagent -n minio-aistor
+```
+
+### Testing with Fake Reporting Secret
+
+For development, mpdev uses a fake reporting secret automatically:
+
+```yaml
+reportingSecret: "gs://cloud-marketplace-tools/reporting_secrets/fake_reporting_secret.yaml"
+```
+
+### Resource Overhead
+
+| Sidecar | CPU | Memory |
+|---------|-----|--------|
+| UBBAgent | 50m | 64Mi |
+| Usage Reporter | 10m | 32Mi |
 
 ## Best Practices
 

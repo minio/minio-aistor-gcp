@@ -15,7 +15,7 @@ Monitor the deployment:
    kubectl get objectstore -n {{ .Release.Namespace }}
 
 3. Check MinIO pods:
-   kubectl get pods -n {{ .Release.Namespace }} -l app={{ index .Values "aistor-objectstore" "objectStore" "name" }}
+   kubectl get pods -n {{ .Release.Namespace }} -l app={{ .Release.Name }}-store
 
 ===================================================================================
 ACCESSING MINIO AISTOR
@@ -25,53 +25,23 @@ Once deployment is complete:
 
 1. Get your MinIO root credentials:
 
-   kubectl get secret {{ index .Values "aistor-objectstore" "secrets" "name" }} \
+   kubectl get secret {{ .Release.Name }}-env-config \
      -n {{ .Release.Namespace }} \
      -o jsonpath='{.data.config\.env}' | base64 -d
 
 2. Access MinIO Console (Web UI):
 
-{{- $consoleServiceType := index .Values "aistor-objectstore" "objectStore" "services" "console" "serviceType" }}
-{{- if eq $consoleServiceType "LoadBalancer" }}
    Wait for LoadBalancer IP:
-   kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/console={{ index .Values "aistor-objectstore" "objectStore" "name" }}
+   kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/console={{ .Release.Name }}-store
 
    Access via: http://<EXTERNAL-IP>:9001
-{{- else if eq $consoleServiceType "NodePort" }}
-   Get NodePort:
-   kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/console={{ index .Values "aistor-objectstore" "objectStore" "name" }}
-
-   Access via: http://<NODE-IP>:<NODE-PORT>
-{{- else }}
-   Port-forward:
-   kubectl port-forward -n {{ .Release.Namespace }} \
-     svc/$(kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/console={{ index .Values "aistor-objectstore" "objectStore" "name" }} -o name | head -1) \
-     9001:9001
-
-   Access via: http://localhost:9001
-{{- end }}
 
 3. Access MinIO API (S3 endpoint):
 
-{{- $minioServiceType := index .Values "aistor-objectstore" "objectStore" "services" "minio" "serviceType" }}
-{{- if eq $minioServiceType "LoadBalancer" }}
    Wait for LoadBalancer IP:
-   kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/tenant={{ index .Values "aistor-objectstore" "objectStore" "name" }}
+   kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/tenant={{ .Release.Name }}-store
 
    S3 Endpoint: http://<EXTERNAL-IP>:9000
-{{- else if eq $minioServiceType "NodePort" }}
-   Get NodePort:
-   kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/tenant={{ index .Values "aistor-objectstore" "objectStore" "name" }}
-
-   S3 Endpoint: http://<NODE-IP>:<NODE-PORT>
-{{- else }}
-   Port-forward:
-   kubectl port-forward -n {{ .Release.Namespace }} \
-     svc/$(kubectl get svc -n {{ .Release.Namespace }} -l v1.min.io/tenant={{ index .Values "aistor-objectstore" "objectStore" "name" }} -o name | head -1) \
-     9000:9000
-
-   S3 Endpoint: http://localhost:9000
-{{- end }}
 
 ===================================================================================
 USING MINIO CLIENT (mc)
@@ -90,13 +60,13 @@ Test connection:
 ===================================================================================
 CLUSTER INFORMATION
 ===================================================================================
-{{- $firstPool := include "minio-aistor.firstPool" . | fromYaml }}
+{{- $firstPool := index .Values.objectstore.pools "0" }}
 Release Name:     {{ .Release.Name }}
 Namespace:        {{ .Release.Namespace }}
-Object Store:     {{ index .Values "aistor-objectstore" "objectStore" "name" }}
-Servers:          {{ $firstPool.servers }}
-Volumes/Server:   {{ $firstPool.volumesPerServer }}
-Storage/Volume:   {{ $firstPool.size }}
+Object Store:     {{ .Release.Name }}-store
+Servers:          {{ $firstPool.servers | default 1 }}
+Volumes/Server:   {{ $firstPool.volumesPerServer | default 4 }}
+Storage/Volume:   {{ $firstPool.size | default "10Gi" }}
 
 ===================================================================================
 DOCUMENTATION
@@ -106,4 +76,4 @@ MinIO AIStor Docs: https://docs.min.io/enterprise/aistor-object-store/
 Operator Guide:    https://docs.min.io/enterprise/aistor-object-store/reference/kubernetes/
 MinIO Support:     https://min.io/support
 
-Enjoy using MinIO AIStor with Operator! 🚀
+Enjoy using MinIO AIStor with Operator!

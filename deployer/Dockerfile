@@ -19,4 +19,4 @@ RUN chmod +x /bin/deploy.sh /bin/deploy_with_tests.sh
 
 # Add required annotations for 2025 requirements
 # Full service endpoint format: services/<product_id>.endpoints.<project_id>.cloud.goog
-LABEL com.googleapis.cloudmarketplace.product.service.name="services/minio-aistor-objectstore.endpoints.minio-inc-public.cloud.goog"
+LABEL com.googleapis.cloudmarketplace.product.service.name="services/aistor.endpoints.minio-inc-public.cloud.goog"

@@ -12,8 +12,6 @@ x-google-marketplace:
     recommended: true
 
   # Deployer service account permissions
-  # The deployer needs cluster-scoped permissions to create CRDs and ClusterRoles
-  # during the initial deployment of the MinIO AIStor Operator
   deployerServiceAccount:
     description: >
       Creates cluster-scoped resources required by MinIO AIStor Operator,
@@ -28,7 +26,6 @@ x-google-marketplace:
         resources: ['customresourcedefinitions']
         verbs: ['get', 'list', 'create', 'update', 'patch']
       # ClusterRole management - required for operator RBAC setup
-      # Including 'bind' and 'escalate' to allow creating roles with any permissions
       - apiGroups: ['rbac.authorization.k8s.io']
         resources: ['clusterroles', 'clusterrolebindings', 'roles', 'rolebindings']
         verbs: ['get', 'list', 'create', 'update', 'patch', 'bind', 'escalate']
@@ -45,6 +42,10 @@ x-google-marketplace:
       - apiGroups: ['authentication.k8s.io']
         resources: ['tokenreviews']
         verbs: ['create']
+      # Webhook configurations - required for operator webhook setup
+      - apiGroups: ['admissionregistration.k8s.io']
+        resources: ['mutatingwebhookconfigurations', 'validatingwebhookconfigurations']
+        verbs: ['get', 'list', 'create', 'update', 'patch', 'delete']
 
   # Image declarations
   images:
@@ -56,13 +57,10 @@ x-google-marketplace:
   # Cluster constraints
   clusterConstraints:
     resources:
-    - replicas: 4
+    - replicas: 1
       requests:
         cpu: 1000m
         memory: 2Gi
-      affinity:
-        simpleNodeAffinity:
-          type: REQUIRE_ONE_NODE_PER_REPLICA
 
 properties:
   name:
@@ -81,7 +79,7 @@ properties:
     description: The Kubernetes namespace where MinIO AIStor will be deployed
 
   # MinIO AIStor License (REQUIRED)
-  aistor-objectstore-operator.license:
+  aistor-operator.license:
     type: string
     title: AIStor License Key
     description: |
@@ -93,25 +91,17 @@ properties:
       type: STRING
 
   # Object Store Configuration
-  aistor-objectstore.objectStore.pools.0.servers:
+  # Number of servers is fixed to 1 (hidden from UI)
+  objectstore.pools.0.servers:
     type: integer
-    title: Number of servers
-    description: |
-      Number of MinIO server replicas to deploy.
-      Minimum 4 for distributed mode (recommended for production).
-    default: 4
-    minimum: 4
-    maximum: 32
+    default: 1
 
-  aistor-objectstore.objectStore.pools.0.name:
+  # Pool name is fixed to pool-0 (hidden from UI)
+  objectstore.pools.0.name:
     type: string
-    title: Pool name
-    description: Internal name for the storage pool (used by MinIO for pool identification)
     default: pool-0
-    x-google-marketplace:
-      type: STRING
 
-  aistor-objectstore.objectStore.pools.0.volumesPerServer:
+  objectstore.pools.0.volumesPerServer:
     type: integer
     title: Volumes per server
     description: Number of storage volumes attached to each MinIO server
@@ -119,7 +109,7 @@ properties:
     minimum: 1
     maximum: 16
 
-  aistor-objectstore.objectStore.pools.0.size:
+  objectstore.pools.0.size:
     type: string
     title: Storage size per volume
     description: Size of persistent volume for each volume attachment (e.g., 10Gi, 100Gi, 1Ti)
@@ -127,13 +117,13 @@ properties:
     pattern: '^[1-9][0-9]*(\.[0-9]+)?[GT]i$'
 
   # Root Credentials
-  aistor-objectstore.secrets.accessKey:
+  secrets.accessKey:
     type: string
     title: Root access key
     description: MinIO root access key (username)
     default: admin
 
-  aistor-objectstore.secrets.secretKey:
+  secrets.secretKey:
     type: string
     x-google-marketplace:
       type: GENERATED_PASSWORD
@@ -143,6 +133,14 @@ properties:
         base64: false
     title: Root secret key
     description: MinIO root secret key (password) - auto-generated if not provided
+
+  # GCP Marketplace Reporting Secret (for usage-based billing)
+  reportingSecret:
+    type: string
+    x-google-marketplace:
+      type: REPORTING_SECRET
+    title: Reporting Secret
+    description: GCP Marketplace reporting secret for usage-based billing
 
   # Service Account
   serviceAccount:
@@ -179,11 +177,9 @@ properties:
 required:
 - name
 - namespace
-- aistor-objectstore-operator.license
-- aistor-objectstore.objectStore.pools.0.servers
-- aistor-objectstore.objectStore.pools.0.name
-- aistor-objectstore.objectStore.pools.0.volumesPerServer
-- aistor-objectstore.objectStore.pools.0.size
-- aistor-objectstore.secrets.accessKey
-- aistor-objectstore.secrets.secretKey
+- aistor-operator.license
+- objectstore.pools.0.volumesPerServer
+- objectstore.pools.0.size
+- secrets.accessKey
+- secrets.secretKey
 - serviceAccount

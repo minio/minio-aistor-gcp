@@ -145,7 +145,7 @@ metadata:
     app.kubernetes.io/name: minio-aistor
   annotations:
     kubernetes-engine.cloud.google.com/icon: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...
-    marketplace.cloud.google.com/deploy-info: '{"partner_id": "minio-inc-public", "product_id": "minio-aistor-objectstore"}'
+    marketplace.cloud.google.com/deploy-info: '{"partner_id": "minio-inc-public", "product_id": "aistor"}'
 spec:
   descriptor:
     type: "MinIO AIStor"
@@ -197,7 +197,7 @@ spec:
       restartPolicy: OnFailure
       containers:
       - name: deployer
-        image: gcr.io/minio-inc-public/minio-aistor/deployer:1.0
+        image: gcr.io/minio-inc-public/aistor/deployer:1.0
         env:
         - name: NAME
           value: "${APP_INSTANCE_NAME}"
@@ -254,32 +254,27 @@ kubectl get svc -n ${NAMESPACE}
 ### Retrieve MinIO Credentials
 
 ```bash
-# Get access key
-kubectl get secret ${APP_INSTANCE_NAME}-minio-aistor-env-config \
+# Get credentials from config.env secret
+kubectl get secret ${APP_INSTANCE_NAME}-env-config \
   -n ${NAMESPACE} \
-  -o jsonpath='{.data.MINIO_ROOT_USER}' | base64 -d
-echo
-
-# Get secret key
-kubectl get secret ${APP_INSTANCE_NAME}-minio-aistor-env-config \
-  -n ${NAMESPACE} \
-  -o jsonpath='{.data.MINIO_ROOT_PASSWORD}' | base64 -d
-echo
+  -o jsonpath='{.data.config\.env}' | base64 -d
+# Output shows: export MINIO_ROOT_USER="..." and export MINIO_ROOT_PASSWORD="..."
 ```
 
 ### Get Service Endpoints
 
 ```bash
-# Get MinIO API endpoint (S3-compatible API)
-kubectl get svc ${APP_INSTANCE_NAME}-minio-aistor-minio \
-  -n ${NAMESPACE} \
-  -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+# List all services
+kubectl get svc -n ${NAMESPACE}
+
+# Get MinIO API endpoint (S3-compatible API on port 80)
+kubectl get svc -n ${NAMESPACE} -l v1.min.io/tenant=${APP_INSTANCE_NAME}-store \
+  -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}'
 echo
 
-# Get MinIO Console endpoint (Web UI)
-kubectl get svc ${APP_INSTANCE_NAME}-minio-aistor-console \
-  -n ${NAMESPACE} \
-  -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+# Get MinIO Console endpoint (Web UI on port 9001)
+kubectl get svc -n ${NAMESPACE} -l v1.min.io/console=${APP_INSTANCE_NAME}-store-console \
+  -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}'
 echo
 ```
 
@@ -288,16 +283,17 @@ echo
 If using LoadBalancer service type:
 ```bash
 # Get Console URL
-CONSOLE_IP=$(kubectl get svc ${APP_INSTANCE_NAME}-minio-aistor-console \
-  -n ${NAMESPACE} \
-  -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+CONSOLE_IP=$(kubectl get svc -n ${NAMESPACE} \
+  -l v1.min.io/console=${APP_INSTANCE_NAME}-store-console \
+  -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
 echo "MinIO Console: http://${CONSOLE_IP}:9001"
 ```
 
 If using ClusterIP, use port-forward:
 ```bash
-kubectl port-forward svc/${APP_INSTANCE_NAME}-minio-aistor-console \
-  -n ${NAMESPACE} 9001:9001
+kubectl port-forward -n ${NAMESPACE} \
+  svc/$(kubectl get svc -n ${NAMESPACE} -l v1.min.io/console -o name | head -1 | cut -d/ -f2) \
+  9001:9001
 # Access at: http://localhost:9001
 ```
 
@@ -313,18 +309,20 @@ wget https://dl.min.io/client/mc/release/linux-amd64/mc
 chmod +x mc
 sudo mv mc /usr/local/bin/
 
-# Configure alias
-API_ENDPOINT=$(kubectl get svc ${APP_INSTANCE_NAME}-minio-aistor-minio \
-  -n ${NAMESPACE} \
-  -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+# Get API endpoint
+API_ENDPOINT=$(kubectl get svc -n ${NAMESPACE} -l v1.min.io/tenant \
+  -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
 
-mc alias set aistor http://${API_ENDPOINT}:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY}
+# Configure using MC_HOST (simpler than alias)
+export MC_HOST_aistor="http://${MINIO_ACCESS_KEY}:${MINIO_SECRET_KEY}@${API_ENDPOINT}"
 
 # Test operations
 mc mb aistor/test-bucket
 echo "Hello MinIO AIStor" > test.txt
 mc cp test.txt aistor/test-bucket/
 mc ls aistor/test-bucket/
+mc rm aistor/test-bucket/test.txt
+mc rb aistor/test-bucket
 ```
 
 ### Check Cluster Health
@@ -334,11 +332,17 @@ mc ls aistor/test-bucket/
 kubectl get pods -n ${NAMESPACE}
 
 # Expected output: All pods in Running state
-# - 1 operator pod
-# - 4 MinIO pods (or your configured server count)
+# - operator pods (adminjob-operator, object-store-operator)
+# - MinIO pods with 4 containers each (minio, sidecar, ubbagent, usage-reporter)
 
-# Check MinIO cluster status
-kubectl logs -n ${NAMESPACE} ${APP_INSTANCE_NAME}-minio-aistor-pool-0-0 | grep -i "status"
+# Check ObjectStore status
+kubectl get objectstore -n ${NAMESPACE}
+
+# Check MinIO pod logs
+kubectl logs -n ${NAMESPACE} ${APP_INSTANCE_NAME}-store-pool-0-0 -c minio | tail -20
+
+# Check usage-reporter logs (billing sidecar)
+kubectl logs -n ${NAMESPACE} ${APP_INSTANCE_NAME}-store-pool-0-0 -c usage-reporter
 ```
 
 ## Configuration Reference
@@ -380,7 +384,7 @@ kubectl logs -n ${NAMESPACE} job/${APP_INSTANCE_NAME}-deployer
 
 ```bash
 # Describe pod for events
-kubectl describe pod -n ${NAMESPACE} ${APP_INSTANCE_NAME}-minio-aistor-pool-0-0
+kubectl describe pod -n ${NAMESPACE} ${APP_INSTANCE_NAME}-store-pool-0-0
 
 # Common issues:
 # - Insufficient CPU/memory

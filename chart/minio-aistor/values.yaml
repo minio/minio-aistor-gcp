@@ -1,112 +1,91 @@
 # GCP Marketplace Configuration
-# Note: name and namespace are set by GCP Marketplace via Release.Name and Release.Namespace
 
-# Enable operator and objectstore deployment
+# Enable operator deployment (via subchart)
 operator:
   enabled: true
 
+# Enable objectstore deployment (via custom template)
 objectstore:
   enabled: true
 
-# GCP Marketplace specific settings
-deployer:
-  image: gcr.io/cloud-marketplace-tools/k8s/deployer_helm:latest
+  # MinIO AIStor image
+  image:
+    repository: quay.io/minio/aistor/minio
+    tag: RELEASE.2025-12-20T04-58-37Z
+    pullPolicy: IfNotPresent
 
+  # Storage pools configuration (using map to match schema)
+  pools:
+    "0":
+      servers: 1
+      name: pool-0
+      volumesPerServer: 4
+      size: 10Gi
+
+      resources:
+        requests:
+          memory: 2Gi
+          cpu: 1000m
+
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: "OnRootMismatch"
+        runAsNonRoot: true
+
+      containerSecurityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        seccompProfile:
+          type: RuntimeDefault
+
+  mountPath: /export
+  subPath: /data
+
+# GCP Marketplace specific settings
 serviceAccount: ""
 
-tls:
-  enabled: false
-  base64EncodedPrivateKey: ""
-  base64EncodedCertificate: ""
+# GCP Marketplace Reporting Secret (for usage-based billing)
+# This is automatically set by GCP Marketplace deployer
+reportingSecret: ""
 
-# Configuration for aistor-objectstore-operator subchart
-aistor-objectstore-operator:
-  # License is set directly from schema.yaml via aistor-objectstore-operator.license
+# Usage-based billing configuration
+billing:
+  serviceName: "aistor.mp-minio-inc-public.appspot.com"
+  metricName: "minio_usage"
+  minimumGiB: 1024
+  # Hour (UTC) when daily usage report runs (0-23, default: 1 = 1 AM UTC)
+  reportHour: 1
+
+# MinIO root credentials
+secrets:
+  accessKey: admin
+  secretKey: ""
+
+# Configuration for aistor-operator subchart (v5.2.1 - supports FREE plan)
+aistor-operator:
   license: ""
-
   global:
     operator:
       replicas: 1
       resources:
         requests:
-          cpu: 500m  # GKE Autopilot minimum for pods with anti-affinity
+          cpu: 500m
           memory: 256Mi
+      # Disable autocert to avoid GKE Autopilot CSR restrictions
+      # Note: value must be "on" to disable (counterintuitive code logic)
+      extraEnv:
+        - name: OPERATOR_AUTO_CERT_DISABLED
+          value: "on"
 
   operators:
     adminjob:
       disabled: false
     object-store:
       disabled: false
-
-# Configuration for aistor-objectstore subchart
-aistor-objectstore:
-  # Object Store configuration
-  objectStore:
-    name: minio-aistor-store
-
-    # Configuration secret for root credentials
-    configuration:
-      name: minio-aistor-env-config
-
-    # Pool configuration
-    # Note: If schema provides dictionary format, it will be converted to array by template
-    pools:
-      - servers: 4
-        name: pool-0
-        volumesPerServer: 4
-        size: 10Gi
-        storageClassName: ""
-
-        resources:
-          requests:
-            memory: 2Gi
-            cpu: 1000m
-          limits:
-            memory: 4Gi
-            cpu: 2000m
-
-        securityContext:
-          runAsUser: 1000
-          runAsGroup: 1000
-          fsGroup: 1000
-          fsGroupChangePolicy: "OnRootMismatch"
-          runAsNonRoot: true
-
-        containerSecurityContext:
-          runAsUser: 1000
-          runAsGroup: 1000
-          runAsNonRoot: true
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-          seccompProfile:
-            type: RuntimeDefault
-
-    # Storage paths
-    mountPath: /export
-    subPath: /data
-
-    # Services configuration
-    services:
-      console:
-        serviceType: LoadBalancer
-      minio:
-        serviceType: LoadBalancer
-
-    # Metrics
-    metrics:
-      enabled: true
-      port: 9000
-      protocol: http
-
-    # Pod management
-    podManagementPolicy: Parallel
-
-  # Root credentials (will be created as secret)
-  secrets:
-    name: minio-aistor-env-config
-    accessKey: admin
-    secretKey: ""  # Will be generated from schema.yaml
-
-# Note: Image configuration is handled by subcharts and GCP Marketplace schema.yaml

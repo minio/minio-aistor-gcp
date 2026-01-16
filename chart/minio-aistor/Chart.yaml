@@ -18,11 +18,8 @@ maintainers:
     email: dev@min.io
 
 dependencies:
-  - name: aistor-objectstore-operator
-    version: "5.1.0"
+  # Only the operator subchart - ObjectStore is deployed via custom template
+  - name: aistor-operator
+    version: "5.2.1"
     repository: "https://helm.min.io/"
     condition: operator.enabled
-  - name: aistor-objectstore
-    version: "1.0.10"
-    repository: "https://helm.min.io/"
-    condition: objectstore.enabled

@@ -24,7 +24,7 @@ See [CLI Deployment Guide](CLI_DEPLOYMENT.md) for complete instructions.
 ```bash
 # Quick example
 kubectl create job deployer \
-  --image=gcr.io/minio-inc-public/minio-aistor/deployer:1.0 \
+  --image=gcr.io/minio-inc-public/aistor/deployer:1.0 \
   --namespace=minio-aistor
 ```
 
@@ -54,17 +54,15 @@ kubectl get svc minio-aistor-console -n minio-aistor \
 ## Configuration
 
 MinIO AIStor can be customized during deployment. Default configuration:
-- 4 servers with 4 volumes each (10Gi per volume)
+- 1 server with 4 volumes each (10Gi per volume)
 - 2Gi RAM, 1 CPU per server
 - LoadBalancer services for API and Console
 
-📖 **See [DEPLOYMENT_PARAMETERS.md](DEPLOYMENT_PARAMETERS.md) for all configuration options**
 
 ## Documentation
 
 - **[MinIO AIStor Docs](https://docs.min.io/enterprise/aistor-object-store/)** - Official MinIO documentation
 - **[CLI Deployment Guide](CLI_DEPLOYMENT.md)** - Deploy using kubectl and gcloud
-- **[Parameter Reference](DEPLOYMENT_PARAMETERS.md)** - All 9 configuration parameters
 
 ## Support
 
@@ -73,7 +71,7 @@ MinIO AIStor can be customized during deployment. Default configuration:
 
 ## Pricing
 
-**BYOL (Bring Your Own License)** - License purchased separately from MinIO. Standard GKE infrastructure costs apply.
+**BYOL (Bring Your Own License)** - License obtained separately from MinIO. Standard GKE infrastructure costs apply.
 
 **Contact MinIO** for licensing: https://min.io/pricing
 

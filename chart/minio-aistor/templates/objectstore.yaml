@@ -1,0 +1,172 @@
+{{- if .Values.objectstore.enabled }}
+# MinIO AIStor ObjectStore with GCP Marketplace billing sidecars
+apiVersion: aistor.min.io/v1
+kind: ObjectStore
+metadata:
+  name: {{ .Release.Name }}-store
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: objectstore
+spec:
+  # MinIO AIStor image
+  image: "{{ .Values.objectstore.image.repository }}:{{ .Values.objectstore.image.tag }}"
+  imagePullPolicy: {{ .Values.objectstore.image.pullPolicy }}
+
+  # Configuration secret
+  configuration:
+    name: {{ .Release.Name }}-env-config
+
+  # Storage pools (iterate over map keys)
+  pools:
+    {{- range $key, $pool := .Values.objectstore.pools }}
+    - servers: {{ $pool.servers }}
+      name: {{ $pool.name }}
+      volumesPerServer: {{ $pool.volumesPerServer }}
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: {{ $pool.size }}
+      {{- if $pool.resources }}
+      resources:
+        {{- if $pool.resources.requests }}
+        requests:
+          {{- if $pool.resources.requests.memory }}
+          memory: {{ $pool.resources.requests.memory }}
+          {{- end }}
+          {{- if $pool.resources.requests.cpu }}
+          cpu: {{ $pool.resources.requests.cpu }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- if $pool.securityContext }}
+      securityContext:
+        {{- if $pool.securityContext.runAsUser }}
+        runAsUser: {{ $pool.securityContext.runAsUser }}
+        {{- end }}
+        {{- if $pool.securityContext.runAsGroup }}
+        runAsGroup: {{ $pool.securityContext.runAsGroup }}
+        {{- end }}
+        {{- if $pool.securityContext.fsGroup }}
+        fsGroup: {{ $pool.securityContext.fsGroup }}
+        {{- end }}
+        {{- if $pool.securityContext.fsGroupChangePolicy }}
+        fsGroupChangePolicy: {{ $pool.securityContext.fsGroupChangePolicy | quote }}
+        {{- end }}
+        {{- if $pool.securityContext.runAsNonRoot }}
+        runAsNonRoot: {{ $pool.securityContext.runAsNonRoot }}
+        {{- end }}
+      {{- end }}
+      {{- if $pool.containerSecurityContext }}
+      containerSecurityContext:
+        {{- if $pool.containerSecurityContext.runAsUser }}
+        runAsUser: {{ $pool.containerSecurityContext.runAsUser }}
+        {{- end }}
+        {{- if $pool.containerSecurityContext.runAsGroup }}
+        runAsGroup: {{ $pool.containerSecurityContext.runAsGroup }}
+        {{- end }}
+        {{- if $pool.containerSecurityContext.runAsNonRoot }}
+        runAsNonRoot: {{ $pool.containerSecurityContext.runAsNonRoot }}
+        {{- end }}
+        {{- if $pool.containerSecurityContext.allowPrivilegeEscalation }}
+        allowPrivilegeEscalation: {{ $pool.containerSecurityContext.allowPrivilegeEscalation }}
+        {{- else }}
+        allowPrivilegeEscalation: false
+        {{- end }}
+        {{- if $pool.containerSecurityContext.capabilities }}
+        capabilities:
+          {{- if $pool.containerSecurityContext.capabilities.drop }}
+          drop:
+            {{- range $pool.containerSecurityContext.capabilities.drop }}
+            - {{ . }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+        {{- if $pool.containerSecurityContext.seccompProfile }}
+        seccompProfile:
+          type: {{ $pool.containerSecurityContext.seccompProfile.type }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+
+  mountPath: {{ .Values.objectstore.mountPath }}
+  subPath: {{ .Values.objectstore.subPath }}
+
+  # Disable auto-cert generation (required for GKE Autopilot and simpler deployments)
+  certificates:
+    disableAutoCert: true
+
+  # GCP Marketplace billing sidecars
+  sideCars:
+    containers:
+      # UBBAgent - GCP Marketplace metering agent
+      - name: ubbagent
+        image: gcr.io/cloud-marketplace-tools/metering/ubbagent:latest
+        env:
+          - name: AGENT_CONFIG_FILE
+            value: /etc/ubbagent/config.yaml
+          - name: AGENT_STATE_DIR
+            value: /var/lib/ubbagent
+          - name: AGENT_LOCAL_PORT
+            value: "4567"
+          - name: AGENT_ENCODED_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.reportingSecret }}
+                key: reporting-key
+          - name: AGENT_CONSUMER_ID
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.reportingSecret }}
+                key: consumer-id
+        volumeMounts:
+          - name: ubbagent-config
+            mountPath: /etc/ubbagent
+            readOnly: true
+          - name: ubbagent-state
+            mountPath: /var/lib/ubbagent
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+
+      # Usage Reporter - Collects MinIO storage metrics daily
+      - name: usage-reporter
+        image: gcr.io/minio-inc-public/aistor/usage-reporter:1.0.0
+        command: ["/bin/sh", "-c", "/scripts/start-cron.sh"]
+        volumeMounts:
+          - name: reporter-scripts
+            mountPath: /scripts
+            readOnly: true
+          - name: minio-config
+            mountPath: /minio-config
+            readOnly: true
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
+
+    volumes:
+      - name: ubbagent-config
+        configMap:
+          name: {{ .Release.Name }}-ubbagent-config
+      - name: ubbagent-state
+        emptyDir: {}
+      - name: reporter-scripts
+        configMap:
+          name: {{ .Release.Name }}-reporter-scripts
+          defaultMode: 0755
+      - name: minio-config
+        secret:
+          secretName: {{ .Release.Name }}-env-config
+{{- end }}
