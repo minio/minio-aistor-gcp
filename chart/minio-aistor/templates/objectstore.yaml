@@ -18,11 +18,11 @@ spec:
   configuration:
     name: {{ .Release.Name }}-env-config
 
-  # Storage pools (iterate over map keys)
+  # Storage pools (single pool with hardcoded server count)
   pools:
     {{- range $key, $pool := .Values.objectstore.pools }}
-    - servers: {{ $pool.servers }}
-      name: {{ $pool.name }}
+    - servers: 1
+      name: pool-0
       volumesPerServer: {{ $pool.volumesPerServer }}
       volumeClaimTemplate:
         spec:

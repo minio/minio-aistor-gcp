@@ -91,16 +91,6 @@ properties:
       type: STRING
 
   # Object Store Configuration
-  # Number of servers is fixed to 1 (hidden from UI)
-  objectstore.pools.0.servers:
-    type: integer
-    default: 1
-
-  # Pool name is fixed to pool-0 (hidden from UI)
-  objectstore.pools.0.name:
-    type: string
-    default: pool-0
-
   objectstore.pools.0.volumesPerServer:
     type: integer
     title: Volumes per server

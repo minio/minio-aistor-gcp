@@ -128,7 +128,7 @@ install:
 	@echo "Installing MinIO AIStor with operator..."
 	mpdev install \
 		--deployer=$(DEPLOYER_IMAGE) \
-		--parameters='{"name": "$(APP_NAME)", "namespace": "$(APP_NAME)", "aistor-operator.license": "$(LICENSE_KEY)", "reportingSecret": "gs://cloud-marketplace-tools/reporting_secrets/fake_reporting_secret.yaml", "objectstore.pools.0.servers": 1, "objectstore.pools.0.volumesPerServer": 4, "objectstore.pools.0.size": "10Gi"}'
+		--parameters='{"name": "$(APP_NAME)", "namespace": "$(APP_NAME)", "aistor-operator.license": "$(LICENSE_KEY)", "reportingSecret": "gs://cloud-marketplace-tools/reporting_secrets/fake_reporting_secret.yaml", "objectstore.pools.0.volumesPerServer": 4, "objectstore.pools.0.size": "10Gi"}'
 
 .PHONY: uninstall
 uninstall:

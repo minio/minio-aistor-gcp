@@ -14,11 +14,9 @@ objectstore:
     tag: RELEASE.2025-12-20T04-58-37Z
     pullPolicy: IfNotPresent
 
-  # Storage pools configuration (using map to match schema)
+  # Storage pools configuration (servers=1 and name=pool-0 are hardcoded in template)
   pools:
     "0":
-      servers: 1
-      name: pool-0
       volumesPerServer: 4
       size: 10Gi
 
@@ -57,7 +55,7 @@ reportingSecret: ""
 
 # Usage-based billing configuration
 billing:
-  serviceName: "aistor.mp-minio-inc-public.appspot.com"
+  serviceName: "aistor.endpoints.minio-inc-public.cloud.goog"
   metricName: "minio_usage"
   minimumGiB: 1024
   # Hour (UTC) when daily usage report runs (0-23, default: 1 = 1 AM UTC)
