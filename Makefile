@@ -21,8 +21,8 @@ REGISTRY ?= gcr.io/minio-inc-public
 APP_NAME = minio-aistor
 PRODUCT_ID = aistor
 TAG ?= latest
-VERSION ?= 1.0.0
-MARKETPLACE_TOOLS_TAG ?= 0.12.10
+VERSION ?= 1.0.1
+MARKETPLACE_TOOLS_TAG ?= 0.12.14
 
 # License (must be provided for installation)
 LICENSE_KEY ?=

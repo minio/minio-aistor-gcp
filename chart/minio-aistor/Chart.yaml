@@ -1,8 +1,8 @@
 apiVersion: v2
 name: minio-aistor
 description: MinIO AIStor - High-Performance Object Storage for AI/ML Workloads (GCP Marketplace)
-version: 1.0.0
-appVersion: "1.0.0"
+version: 1.0.1
+appVersion: "1.0.1"
 keywords:
   - storage
   - object-storage

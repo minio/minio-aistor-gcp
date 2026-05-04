@@ -1,12 +1,11 @@
 x-google-marketplace:
   schemaVersion: v2
   applicationApiVersion: v1beta1
-  publishedVersion: '1.0.0'
+  publishedVersion: '1.0.1'
   publishedVersionMetadata:
     releaseNote: >-
-      Simplified deployment configuration with streamlined parameters focusing on essential settings.
-      Updated to latest GCP Marketplace base image (0.12.10) for Kubernetes 1.33+ compatibility.
-      BYOL (Bring Your Own License) - MinIO AIStor is licensed directly through MinIO.
+      Security update: patched CVE-2026-33186 and CVE-2026-27459 by upgrading base image to
+      deployer_helm 0.12.14 and updating pyopenssl and grpc packages.
     releaseTypes:
       - Feature
     recommended: true
