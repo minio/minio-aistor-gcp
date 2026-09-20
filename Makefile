@@ -21,8 +21,14 @@ REGISTRY ?= gcr.io/minio-inc-public
 APP_NAME = minio-aistor
 PRODUCT_ID = aistor
 TAG ?= latest
-VERSION ?= 1.0.1
-MARKETPLACE_TOOLS_TAG ?= 0.12.14
+VERSION ?= 1.0.2
+MARKETPLACE_TOOLS_TAG ?= 13.0.10
+
+# GCP Marketplace requires linux/amd64 deployer images. Set explicitly so builds on
+# arm64 hosts (Apple Silicon) cannot produce an arm64 image or a multi-arch index.
+# --provenance=false keeps the push a plain manifest instead of an OCI index, so the
+# crane annotation below lands on the manifest GCP actually inspects.
+BUILD_PLATFORM_FLAGS ?= --platform linux/amd64 --provenance=false
 
 # License (must be provided for installation)
 LICENSE_KEY ?=
@@ -44,6 +50,7 @@ deps:
 build: deps
 	@echo "Building deployer image..."
 	docker build \
+		$(BUILD_PLATFORM_FLAGS) \
 		--build-arg MARKETPLACE_TOOLS_TAG=$(MARKETPLACE_TOOLS_TAG) \
 		--tag $(DEPLOYER_IMAGE) \
 		-f deployer/Dockerfile \
@@ -53,6 +60,7 @@ build: deps
 build-reporter:
 	@echo "Building usage-reporter image..."
 	docker build \
+		$(BUILD_PLATFORM_FLAGS) \
 		--tag $(REPORTER_IMAGE) \
 		-f images/usage-reporter/Dockerfile \
 		images/usage-reporter/
@@ -78,6 +86,7 @@ release:
 	@echo "Building and releasing version $(VERSION)..."
 	# Build deployer
 	docker build \
+		$(BUILD_PLATFORM_FLAGS) \
 		--build-arg MARKETPLACE_TOOLS_TAG=$(MARKETPLACE_TOOLS_TAG) \
 		--tag $(REGISTRY)/$(PRODUCT_ID)/deployer:$(VERSION) \
 		--tag $(REGISTRY)/$(PRODUCT_ID)/deployer:$(shell echo $(VERSION) | cut -d. -f1,2) \
@@ -86,6 +95,7 @@ release:
 		.
 	# Build usage-reporter
 	docker build \
+		$(BUILD_PLATFORM_FLAGS) \
 		--tag $(REGISTRY)/$(PRODUCT_ID)/usage-reporter:$(VERSION) \
 		--tag $(REGISTRY)/$(PRODUCT_ID)/usage-reporter:$(shell echo $(VERSION) | cut -d. -f1,2) \
 		--tag $(REGISTRY)/$(PRODUCT_ID)/usage-reporter:latest \

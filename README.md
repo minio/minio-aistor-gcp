@@ -81,4 +81,4 @@ This packaging is for deploying MinIO AIStor through GCP Marketplace. See [MinIO
 
 ---
 
-**Version 1.0.0** • **Publisher:** MinIO Inc • **Contact:** https://min.io/contact
+**Version 1.0.2** • **Publisher:** MinIO Inc • **Contact:** https://min.io/contact

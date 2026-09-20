@@ -61,6 +61,13 @@ billing:
   # Hour (UTC) when daily usage report runs (0-23, default: 1 = 1 AM UTC)
   reportHour: 1
 
+  # Usage reporter sidecar image (built and pushed by `make release`)
+  # Bump this tag whenever VERSION changes, or the chart keeps pointing at the old image
+  reporter:
+    repository: gcr.io/minio-inc-public/aistor/usage-reporter
+    tag: 1.0.2
+    pullPolicy: IfNotPresent
+
 # MinIO root credentials
 secrets:
   accessKey: admin

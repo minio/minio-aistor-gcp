@@ -371,9 +371,18 @@ cat /tmp/mpdev-verify.log
    publishedVersion: '1.0.1'
    ```
 
-3. Update version documentation as needed
+3. Update the usage-reporter sidecar pin in `chart/minio-aistor/values.yaml` to match:
+   ```yaml
+   billing:
+     reporter:
+       tag: 1.0.1
+   ```
+   `make release` pushes `usage-reporter:$(VERSION)`, but the chart does not track `VERSION`
+   automatically. Skipping this leaves the deployed sidecar on the previous image.
 
-4. Build, tag, and annotate:
+4. Update version documentation as needed
+
+5. Build, tag, and annotate:
    ```bash
    make build
    docker tag gcr.io/minio-inc-public/aistor/deployer:latest \
@@ -391,7 +400,7 @@ cat /tmp/mpdev-verify.log
    crane tag gcr.io/minio-inc-public/aistor/deployer:1.0.1 latest
    ```
 
-5. Update in Partner Hub:
+6. Update in Partner Hub:
    - Navigate to product listing
    - Click "Add Version"
    - Specify deployer image: `gcr.io/minio-inc-public/aistor/deployer:1.0`

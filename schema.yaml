@@ -1,13 +1,16 @@
 x-google-marketplace:
   schemaVersion: v2
   applicationApiVersion: v1beta1
-  publishedVersion: '1.0.1'
+  publishedVersion: '1.0.2'
   publishedVersionMetadata:
     releaseNote: >-
-      Security update: patched CVE-2026-33186 and CVE-2026-27459 by upgrading base image to
-      deployer_helm 0.12.14 and updating pyopenssl and grpc packages.
+      Security and maintenance update: upgraded the deployer base image from the deprecated
+      deployer_helm 0.12.14 to 13.0.10, picking up cryptography 46.0.7 and current patched OS
+      packages. Also corrected the usage-reporter billing sidecar, which was pinned to a stale
+      image tag and did not track the released version.
     releaseTypes:
-      - Feature
+      - Security
+      - BugFix
     recommended: true
 
   # Deployer service account permissions

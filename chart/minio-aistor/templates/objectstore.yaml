@@ -139,7 +139,8 @@ spec:
 
       # Usage Reporter - Collects MinIO storage metrics daily
       - name: usage-reporter
-        image: gcr.io/minio-inc-public/aistor/usage-reporter:1.0.0
+        image: "{{ .Values.billing.reporter.repository }}:{{ .Values.billing.reporter.tag }}"
+        imagePullPolicy: {{ .Values.billing.reporter.pullPolicy }}
         command: ["/bin/sh", "-c", "/scripts/start-cron.sh"]
         volumeMounts:
           - name: reporter-scripts
