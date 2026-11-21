@@ -21,8 +21,8 @@ REGISTRY ?= gcr.io/minio-inc-public
 APP_NAME = minio-aistor
 PRODUCT_ID = aistor
 TAG ?= latest
-VERSION ?= 1.0.2
-MARKETPLACE_TOOLS_TAG ?= 13.0.10
+VERSION ?= 1.0.3
+MARKETPLACE_TOOLS_TAG ?= 13.0.17
 
 # GCP Marketplace requires linux/amd64 deployer images. Set explicitly so builds on
 # arm64 hosts (Apple Silicon) cannot produce an arm64 image or a multi-arch index.

@@ -1,13 +1,13 @@
 x-google-marketplace:
   schemaVersion: v2
   applicationApiVersion: v1beta1
-  publishedVersion: '1.0.2'
+  publishedVersion: '1.0.3'
   publishedVersionMetadata:
     releaseNote: >-
-      Security and maintenance update: upgraded the deployer base image from the deprecated
-      deployer_helm 0.12.14 to 13.0.10, picking up cryptography 46.0.7 and current patched OS
-      packages. Also corrected the usage-reporter billing sidecar, which was pinned to a stale
-      image tag and did not track the released version.
+      Security update: upgraded the deployer base image from deployer_helm 13.0.10 to 13.0.17
+      (Helm v4.3.1, kubectl v1.37), resolving Go standard library and golang.org/x/crypto
+      CVEs in the bundled helm and kubectl binaries. The usage-reporter billing sidecar now
+      uses the MinIO AIStor client (mc) in place of the retired community build.
     releaseTypes:
       - Security
       - BugFix
